@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.palordersoftworks.brokenstarsmpmod.mixins.client",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [],
+  "client": [
+    "ClientItemStackStackableMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
