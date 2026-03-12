@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "brokenstarsmp",
+  "version": "${version}",
+  "name": "The brokenstarsmp QOL mod",
+  "description": "Self explanatory",
+  "authors": [
+    "PalorderSoftWorks"
+  ],
+  "contact": {
+    "server": "https://mc.brokenstarsmp.palorderhosting.net"
+  },
+  "license": "MIT",
+  "environment": "server",
+  "mixins": [
+    "brokenstarsmp.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.11",
+    "minecraft": "1.21.11"
+  }
+}

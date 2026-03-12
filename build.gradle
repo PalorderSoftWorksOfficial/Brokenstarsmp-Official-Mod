@@ -1,0 +1,156 @@
+buildscript {
+    repositories { mavenCentral() }
+    dependencies {
+        classpath "org.apache.httpcomponents.client5:httpclient5:5.3"
+        classpath "org.apache.jackrabbit:jackrabbit-webdav:2.22.2"
+    }
+}
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+sourceCompatibility = JavaVersion.VERSION_21
+targetCompatibility = JavaVersion.VERSION_21
+
+archivesBaseName = project.archives_base_name
+version = project.mod_version
+group = project.maven_group
+
+dependencies {
+    // to change the versions see the gradle.properties file
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.3")
+    compileOnly "io.github.llamalad7:mixinextras-common:0.5.3"
+    compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.3"
+
+    compileOnly "cc.tweaked:cc-tweaked-1.21.11-core-api:1.117.1"
+    compileOnly "cc.tweaked:cc-tweaked-1.21.11-common-api:1.117.1"
+    implementation "cc.tweaked:cc-tweaked-1.21.11-fabric:1.117.1"
+    implementation "cc.tweaked:cc-tweaked-1.21.11-fabric-api:1.117.1"
+}
+repositories {
+    maven {
+        name = 'CC-tweaked'
+        url "https://maven.squiddev.cc"
+        content {
+            includeGroup("cc.tweaked")
+        }
+    }
+    maven {
+        name = 'PalorderHosting'
+        url = 'https://maven.palorderhosting.net/'
+    }
+    mavenCentral()
+}
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+// ensure that the encoding is set to UTF-8, no matter what the system default is
+// this fixes some edge cases with special characters not displaying correctly
+// see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
+jar {
+    from "LICENSE"
+}
+
+import org.apache.jackrabbit.webdav.client.methods.HttpMkcol
+import org.apache.http.impl.client.CloseableHttpClient
+import org.apache.http.impl.client.HttpClients
+import org.apache.http.auth.UsernamePasswordCredentials
+import org.apache.http.impl.client.BasicCredentialsProvider
+import org.apache.http.client.CredentialsProvider
+import org.apache.http.auth.AuthScope
+import org.apache.http.HttpStatus
+
+// ------------------------------
+// Task: Create the version folder on the Maven repository
+// ------------------------------
+import org.apache.jackrabbit.webdav.client.methods.HttpMkcol
+import org.apache.http.impl.client.CloseableHttpClient
+import org.apache.http.impl.client.HttpClients
+import org.apache.http.auth.UsernamePasswordCredentials
+import org.apache.http.impl.client.BasicCredentialsProvider
+import org.apache.http.client.CredentialsProvider
+import org.apache.http.auth.AuthScope
+import org.apache.http.HttpStatus
+
+// Task: Create the version folder dynamically for the current mod group/artifact/version
+def createVersionFolderTask = tasks.register('createVersionFolder') {
+    doLast {
+        def version = project.version
+        def groupPath = project.group.toString().replace('.', '/')
+        def artifactId = project.archivesBaseName
+        def url = "https://maven.palorderhosting.net/${groupPath}/${artifactId}/${version}/"
+
+        CredentialsProvider creds = new BasicCredentialsProvider()
+        creds.setCredentials(
+                AuthScope.ANY,
+                new UsernamePasswordCredentials(
+                        System.getenv("MAVEN_USERNAME"),
+                        System.getenv("MAVEN_PASSWORD")
+                )
+        )
+
+        CloseableHttpClient client = HttpClients.custom()
+                .setDefaultCredentialsProvider(creds)
+                .build()
+
+        try {
+            def mk = new HttpMkcol(url)
+            def response = client.execute(mk)
+            def code = response.getStatusLine().getStatusCode()
+
+            if (!(code == HttpStatus.SC_CREATED ||
+                    code == HttpStatus.SC_METHOD_NOT_ALLOWED ||
+                    code == HttpStatus.SC_CONFLICT)) {
+                throw new GradleException("Failed to create version folder: HTTP $code")
+            }
+
+            println "Version folder created (or already exists): ${url}"
+            response.getEntity()?.getContent()?.close()
+        } finally {
+            client.close()
+        }
+    }
+}
+
+// Make publish depend on this task properly
+tasks.named("publish") {
+    dependsOn createVersionFolderTask
+}
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = project.group
+            artifactId = project.archivesBaseName
+            version = project.version
+
+            artifact(remapJar) {
+                builtBy remapJar
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "palorderHosting"
+            url = uri("https://maven.palorderhosting.net/")
+            credentials {
+                username = System.getenv("MAVEN_USERNAME")
+                password = System.getenv("MAVEN_PASSWORD")
+            }
+        }
+    }
+}
