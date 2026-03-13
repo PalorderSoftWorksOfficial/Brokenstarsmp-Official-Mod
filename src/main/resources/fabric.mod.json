@@ -13,13 +13,9 @@
   "license": "MIT",
   "environment": "server",
   "mixins": [
-    "brokenstarsmp.mixins.json"
+    "brokenstarsmp.mixins.json",
+    "brokenstarsmp.mixins.client.json"
   ],
-  "client": {
-    "mixins": [
-      "brokenstarsmp.mixins.client.json"
-    ]
-  },
   "depends": {
     "fabricloader": ">=0.11",
     "minecraft": "1.21.11"

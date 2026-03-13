@@ -6,6 +6,7 @@
   "mixins": [
     "AbstractFurnaceBlockEntity_Mixin",
     "AnvilBlock_Mixin",
+    "BeehiveBlockEntity_Mixin",
     "ChestBlock_Mixin",
     "ExperienceOrbEntity_Mixin",
     "ItemStack_stackableFilledShulkersMixin",

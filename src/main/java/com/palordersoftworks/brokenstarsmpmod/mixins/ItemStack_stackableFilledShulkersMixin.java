@@ -28,21 +28,17 @@ public class ItemStack_stackableFilledShulkersMixin {
         }
     }
     @Inject(method = "areItemsAndComponentsEqual", at = @At("HEAD"), cancellable = true)
-    private static void areItemsAndComponentsEqual(ItemStack stack, ItemStack other, CallbackInfoReturnable<Boolean> cir) {
+    private static void stackableShulkerEquality(ItemStack a, ItemStack b, CallbackInfoReturnable<Boolean> cir) {
 
-        if (!(stack.getItem() instanceof BlockItem blockA) || !(other.getItem() instanceof BlockItem blockB)) return;
+        if (!(a.getItem() instanceof BlockItem blockA) || !(b.getItem() instanceof BlockItem blockB)) return;
         if (!(blockA.getBlock() instanceof ShulkerBoxBlock) || !(blockB.getBlock() instanceof ShulkerBoxBlock)) return;
 
-        ContainerComponent containerA = stack.get(DataComponentTypes.CONTAINER);
-        ContainerComponent containerB = other.get(DataComponentTypes.CONTAINER);
+        ContainerComponent containerA = a.get(DataComponentTypes.CONTAINER);
+        ContainerComponent containerB = b.get(DataComponentTypes.CONTAINER);
 
-        if (containerA != null && containerB != null &&
-                containerA.stream().findAny().isPresent() &&
-                containerB.stream().findAny().isPresent()) {
-
-            if (containerA.equals(containerB)) {
-                cir.setReturnValue(true);
-            }
+        if (containerA != null && containerB != null && containerA.equals(containerB)) {
+            cir.setReturnValue(true);
+            cir.cancel();
         }
     }
 }
