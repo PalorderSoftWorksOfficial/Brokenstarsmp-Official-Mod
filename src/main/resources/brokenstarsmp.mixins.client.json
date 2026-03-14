@@ -4,12 +4,8 @@
   "package": "com.palordersoftworks.brokenstarsmpmod.mixins.client",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "SlotStackSizeMixin"
   ],
   "client": [
-    "ClientDraggedShulkerMixin",
-    "ClientItemStackStackableMixin",
-    "SlotStackRenderingMixin"
   ],
   "injectors": {
     "defaultRequire": 1
