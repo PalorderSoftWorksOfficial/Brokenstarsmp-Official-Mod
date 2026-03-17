@@ -12,12 +12,18 @@
   },
   "license": "MIT",
   "environment": "server",
+  "entrypoints": {
+    "main": [
+      "com.palordersoftworks.brokenstarsmpmod.initiaters.DropAtFeet"
+    ]
+  },
   "mixins": [
     "brokenstarsmp.mixins.json",
     "brokenstarsmp.mixins.client.json"
   ],
   "depends": {
     "fabricloader": ">=0.11",
-    "minecraft": "1.21.11"
+    "minecraft": "1.21.11",
+    "fabric-language-kotlin": ">=1.13.8+kotlin.2.3.0"
   }
 }

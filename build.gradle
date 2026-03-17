@@ -8,6 +8,7 @@ buildscript {
 plugins {
     id 'fabric-loom' version "${loom_version}"
     id 'maven-publish'
+    id 'org.jetbrains.kotlin.jvm' version '2.3.10'
 }
 
 sourceCompatibility = JavaVersion.VERSION_21
@@ -22,7 +23,7 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.3")
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.3"
     compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.3"
@@ -31,6 +32,7 @@ dependencies {
     compileOnly "cc.tweaked:cc-tweaked-1.21.11-common-api:1.117.1"
     implementation "cc.tweaked:cc-tweaked-1.21.11-fabric:1.117.1"
     implementation "cc.tweaked:cc-tweaked-1.21.11-fabric-api:1.117.1"
+    modImplementation "net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0"
 }
 repositories {
     maven {
@@ -92,7 +94,7 @@ def createVersionFolderTask = tasks.register('createVersionFolder') {
         def version = project.version
         def groupPath = project.group.toString().replace('.', '/')
         def artifactId = project.archivesBaseName
-        def url = "https://maven.palorderhosting.net/${groupPath}/${artifactId}/${version}/"
+        def baseUrl = "https://maven.palorderhosting.net/"
 
         CredentialsProvider creds = new BasicCredentialsProvider()
         creds.setCredentials(
@@ -108,18 +110,28 @@ def createVersionFolderTask = tasks.register('createVersionFolder') {
                 .build()
 
         try {
-            def mk = new HttpMkcol(url)
-            def response = client.execute(mk)
-            def code = response.getStatusLine().getStatusCode()
-
-            if (!(code == HttpStatus.SC_CREATED ||
-                    code == HttpStatus.SC_METHOD_NOT_ALLOWED ||
-                    code == HttpStatus.SC_CONFLICT)) {
-                throw new GradleException("Failed to create version folder: HTTP $code")
+            // Rename the closure parameter to avoid conflict
+            def ensurePath = { httpClient, base, path ->
+                def parts = path.split("/")
+                def current = base
+                parts.each { p ->
+                    if (p.trim().isEmpty()) return
+                    current += p + "/"
+                    def mk = new HttpMkcol(current)
+                    def response = httpClient.execute(mk)
+                    def code = response.getStatusLine().getStatusCode()
+                    if (!(code == HttpStatus.SC_CREATED || code == HttpStatus.SC_METHOD_NOT_ALLOWED)) {
+                        throw new GradleException("MKCOL failed for ${current} HTTP $code")
+                    }
+                    response.getEntity()?.getContent()?.close()
+                }
             }
 
-            println "Version folder created (or already exists): ${url}"
-            response.getEntity()?.getContent()?.close()
+            def fullPath = "${groupPath}/${artifactId}/${version}/"
+            ensurePath(client, baseUrl, fullPath)
+
+            println "Version folder created (or already exists): ${baseUrl}${fullPath}"
+
         } finally {
             client.close()
         }
