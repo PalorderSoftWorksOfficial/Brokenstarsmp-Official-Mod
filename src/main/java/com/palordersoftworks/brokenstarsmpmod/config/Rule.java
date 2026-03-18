@@ -8,4 +8,5 @@ public @interface Rule {
     String desc() default "";
     String[] options() default {};
     boolean strict() default false;
+    String name() default "";
 }

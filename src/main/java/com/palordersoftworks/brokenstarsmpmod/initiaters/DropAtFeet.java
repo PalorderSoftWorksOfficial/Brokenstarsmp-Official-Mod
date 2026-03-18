@@ -4,6 +4,7 @@ import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -18,7 +19,6 @@ public class DropAtFeet implements ModInitializer {
     public void onInitialize() {
         ConfigManager.registerAnnotatedConfigs(ServerRules.class);
         ConfigManager.registerCommands();
-
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
             if (!(entity instanceof ItemEntity item)) return;
             if (!(world instanceof ServerWorld serverWorld)) return;
