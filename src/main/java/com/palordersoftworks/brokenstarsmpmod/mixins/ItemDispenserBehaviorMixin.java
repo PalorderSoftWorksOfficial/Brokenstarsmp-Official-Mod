@@ -1,5 +1,6 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
+import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
 import net.minecraft.block.dispenser.ItemDispenserBehavior;
 import net.minecraft.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,7 +17,16 @@ public abstract class ItemDispenserBehaviorMixin {
                     target = "Lnet/minecraft/item/ItemStack;split(I)Lnet/minecraft/item/ItemStack;"
             )
     )
-    private ItemStack brokenstarsmpmod$fullStack(ItemStack stack, int amount) {
-        return stack.split(stack.getCount());
+    private ItemStack brokenstarsmpmod$controlledDropAmount(ItemStack stack, int amount) {
+
+        int ruleAmount = ServerRules.DISPENSER_DROP_AMOUNT;
+
+        if (ruleAmount <= 0) {
+            return stack.split(1);
+        }
+
+        int toDrop = Math.min(ruleAmount, stack.getCount());
+
+        return stack.split(toDrop);
     }
 }
