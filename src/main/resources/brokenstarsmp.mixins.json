@@ -9,10 +9,12 @@
     "BeehiveBlockEntity_Mixin",
     "ChestBlock_Mixin",
     "ExperienceOrbEntity_Mixin",
+    "ItemDispenserBehaviorMixin",
     "ItemGroups_Mixin",
     "ItemStack_stackableFilledShulkersMixin",
     "PrimedTntMixin",
-    "RedstoneWireBlock_fastMixin"
+    "RedstoneWireBlock_fastMixin",
+    "ServerPlayerEntity_Mixin"
   ],
   "client": [
   ],
