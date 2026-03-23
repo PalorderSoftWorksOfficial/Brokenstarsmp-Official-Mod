@@ -1,5 +1,7 @@
 buildscript {
-    repositories { mavenCentral() }
+    repositories {
+        mavenCentral()
+    }
     dependencies {
         classpath "org.apache.httpcomponents.client5:httpclient5:5.3"
         classpath "org.apache.jackrabbit:jackrabbit-webdav:2.22.2"
@@ -36,17 +38,9 @@ dependencies {
 }
 repositories {
     maven {
-        name = 'CC-tweaked'
-        url "https://maven.squiddev.cc"
-        content {
-            includeGroup("cc.tweaked")
-        }
-    }
-    maven {
         name = 'PalorderHosting'
         url = 'https://maven.palorderhosting.net/'
     }
-    mavenCentral()
 }
 processResources {
     inputs.property "version", project.version

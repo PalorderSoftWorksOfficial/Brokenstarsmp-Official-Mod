@@ -1,9 +1,8 @@
 pluginManagement {
     repositories {
-        jcenter()
         maven {
-            name = 'Fabric'
-            url = 'https://maven.fabricmc.net/'
+            name = 'Palorderhosting'
+            url = 'https://maven.palorderhosting.net/'
         }
         gradlePluginPortal()
     }
