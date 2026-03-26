@@ -31,4 +31,6 @@ public class ServerRules {
             name = "dispenserDropAmount"
     )
     public static int DISPENSER_DROP_AMOUNT = 0;
+    @Rule(desc = "§kNull null null null",name = "§k§cnull§r")
+    public static boolean NULL_ENABLED = false;
 }
