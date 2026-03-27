@@ -8,6 +8,7 @@
     "AnvilBlock_Mixin",
     "BeehiveBlockEntity_Mixin",
     "ChestBlock_Mixin",
+    "CrafterBlock_Mixin",
     "ExperienceOrbEntity_Mixin",
     "ItemDispenserBehaviorMixin",
     "ItemGroups_Mixin",

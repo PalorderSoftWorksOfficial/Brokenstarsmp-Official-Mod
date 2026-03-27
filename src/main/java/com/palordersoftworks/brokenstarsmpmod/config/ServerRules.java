@@ -33,4 +33,9 @@ public class ServerRules {
     public static int DISPENSER_DROP_AMOUNT = 0;
     @Rule(desc = "§kNull null null null",name = "§k§cnull§r")
     public static boolean NULL_ENABLED = false;
+    @Rule(
+            desc = "Number of items consumed per crafting operation in the CrafterBlock",
+            name = "crafterCraftAmount"
+    )
+    public static final int CRAFTER_CRAFT_AMOUNT = 0;
 }
