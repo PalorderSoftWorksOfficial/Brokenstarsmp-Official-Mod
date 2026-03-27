@@ -37,5 +37,5 @@ public class ServerRules {
             desc = "Number of items consumed per crafting operation in the CrafterBlock",
             name = "crafterCraftAmount"
     )
-    public static final int CRAFTER_CRAFT_AMOUNT = 0;
+    public static int CRAFTER_CRAFT_AMOUNT = 0;
 }
