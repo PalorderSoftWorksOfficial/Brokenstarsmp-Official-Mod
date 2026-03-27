@@ -131,8 +131,54 @@ def createVersionFolderTask = tasks.register('createVersionFolder') {
         }
     }
 }
+def bumpVersionLogic = { type ->
+    if (!["major","minor","patch"].contains(type)) {
+        throw new GradleException("Unknown version type: $type")
+    }
 
-// Make publish depend on this task properly
+    def versionFile = file("gradle.properties")
+    def props = new Properties()
+    versionFile.withInputStream { props.load(it) }
+
+    def currentVersion = props["mod_version"]
+    def matcher = currentVersion =~ /(\d+)\.(\d+)\.(\d+)(-.+)?/
+    if (!matcher.matches()) throw new GradleException("Invalid version format: $currentVersion")
+
+    def major = matcher[0][1].toInteger()
+    def minor = matcher[0][2].toInteger()
+    def patch = matcher[0][3].toInteger()
+    def suffix = matcher[0][4] ?: ""
+
+    switch(type) {
+        case "major": major += 1; minor = 0; patch = 0; break
+        case "minor": minor += 1; patch = 0; break
+        case "patch": patch += 1; break
+    }
+
+    def newVersion = "${major}.${minor}.${patch}${suffix}"
+    println "Bumping version: $currentVersion -> $newVersion"
+
+    versionFile.text = versionFile.text.replaceFirst(/mod_version=.*/, "mod_version=${newVersion}")
+    project.version = newVersion
+}
+
+tasks.register("bumpVersion") {
+    doLast {
+        def type = "patch"
+        def args = gradle.startParameter.taskRequests[0].args
+        args.each { arg ->
+            if (arg.startsWith("--")) type = arg.substring(2)
+        }
+        bumpVersionLogic(type)
+    }
+}
+
+["major", "minor", "patch"].each { t ->
+    tasks.register("bump${t.capitalize()}") {
+        doLast { bumpVersionLogic(t) }
+    }
+}
+
 tasks.named("publish") {
     dependsOn createVersionFolderTask
 }
