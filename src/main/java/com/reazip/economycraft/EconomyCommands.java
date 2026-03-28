@@ -25,6 +25,7 @@ import com.reazip.economycraft.shop.ServerShopUi;
 import com.reazip.economycraft.orders.OrderManager;
 import com.reazip.economycraft.orders.OrderRequest;
 import com.reazip.economycraft.orders.OrdersUi;
+import com.reazip.economycraft.playervault.PlayerVaultCommands;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 
@@ -38,7 +39,9 @@ public final class EconomyCommands {
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(buildRoot(
                 buildAddMoney(),
+                buildAddShards(),
                 buildSetMoney(),
+                buildSetShards(),
                 buildRemoveMoney(),
                 buildRemovePlayer(),
                 buildToggleScoreboard()
@@ -86,6 +89,20 @@ public final class EconomyCommands {
                 )
         );
 
+        dispatcher.register(
+                buildAddShards().requires(src ->
+                        PermissionCompat.gamemaster().test(src)
+                                && EconomyConfig.get().standaloneAdminCommands
+                )
+        );
+
+        dispatcher.register(
+                buildSetShards().requires(src ->
+                        PermissionCompat.gamemaster().test(src)
+                                && EconomyConfig.get().standaloneAdminCommands
+                )
+        );
+
         var serverShop = buildServerShop();
         serverShop.requires(
                 serverShop.getRequirement()
@@ -96,7 +113,9 @@ public final class EconomyCommands {
 
     private static LiteralArgumentBuilder<ServerCommandSource> buildRoot(
             LiteralArgumentBuilder<ServerCommandSource> addMoney,
+            LiteralArgumentBuilder<ServerCommandSource> addShards,
             LiteralArgumentBuilder<ServerCommandSource> setMoney,
+            LiteralArgumentBuilder<ServerCommandSource> setShards,
             LiteralArgumentBuilder<ServerCommandSource> removeMoney,
             LiteralArgumentBuilder<ServerCommandSource> removePlayer,
             LiteralArgumentBuilder<ServerCommandSource> toggleScoreboard
@@ -109,9 +128,17 @@ public final class EconomyCommands {
         root.then(buildShop());
         root.then(buildOrders());
         root.then(buildDaily());
+        root.then(PlayerVaultCommands.ecoSubcommand());
+        root.then(PlayerVaultCommands.ecoPlayervaultAlias());
+        root.then(buildWorth());
+        root.then(buildLeaderboard());
+        root.then(buildShardsEco());
+        root.then(buildCoinflipEco());
 
         root.then(addMoney);
+        root.then(addShards);
         root.then(setMoney);
+        root.then(setShards);
         root.then(removeMoney);
         root.then(removePlayer);
         root.then(toggleScoreboard);
@@ -128,7 +155,11 @@ public final class EconomyCommands {
     // =====================================================================
 
     private static LiteralArgumentBuilder<ServerCommandSource> buildBalance() {
-        return literal("bal")
+        return balanceBranch("bal");
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> balanceBranch(String name) {
+        return literal(name)
                 .then(literal("top")
                         .executes(ctx -> balTop(ctx.getSource())))
                 .executes(ctx -> showBalance(IdentityCompat.of(ctx.getSource().getPlayerOrThrow()), ctx.getSource()))
@@ -196,7 +227,8 @@ public final class EconomyCommands {
         }
 
         var sorted = getSortedEntries(balances, manager);
-        if (sorted.size() > 10) sorted = new ArrayList<>(sorted.subList(0, 10));
+        int cap = EconomyConfig.get().baltopCount;
+        if (sorted.size() > cap) sorted = new ArrayList<>(sorted.subList(0, cap));
 
         StringBuilder sb = new StringBuilder("Top balances:\n");
         for (int i = 0; i < sorted.size(); i++) {
@@ -311,6 +343,198 @@ public final class EconomyCommands {
     }
 
     // =====================================================================
+    // === Worth / leaderboard / shards / coinflip (DonutSMP-style) =======
+    // =====================================================================
+
+    private static LiteralArgumentBuilder<ServerCommandSource> buildWorth() {
+        return literal("worth")
+                .executes(ctx -> worth(ctx.getSource().getPlayerOrThrow(), ctx.getSource()));
+    }
+
+    private static int worth(ServerPlayerEntity player, ServerCommandSource source) {
+        ItemStack stack = player.getMainHandStack();
+        if (stack.isEmpty()) {
+            source.sendError(Text.literal("Hold an item in your main hand.").formatted(Formatting.RED));
+            return 0;
+        }
+        PriceRegistry prices = EconomyCraft.getManager(source.getServer()).getPrices();
+        Long unit = prices.getUnitSell(stack);
+        if (unit == null || unit <= 0) {
+            player.sendMessage(Text.literal("That item cannot be sold here.").formatted(Formatting.GRAY));
+            return 1;
+        }
+        long total = unit * stack.getCount();
+        player.sendMessage(Text.literal("Worth: " + EconomyCraft.formatMoney(total) + " (" + EconomyCraft.formatMoney(unit) + " each)")
+                .formatted(Formatting.YELLOW));
+        return 1;
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> buildLeaderboard() {
+        return literal("leaderboard")
+                .executes(ctx -> balTop(ctx.getSource()))
+                .then(literal("money").executes(ctx -> balTop(ctx.getSource())))
+                .then(literal("shards")
+                        .requires(s -> EconomyConfig.get().shardsEnabled)
+                        .executes(ctx -> shardTop(ctx.getSource())));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> buildShardsEco() {
+        return literal("shards")
+                .requires(s -> EconomyConfig.get().shardsEnabled)
+                .executes(ctx -> showShardsSelf(ctx.getSource().getPlayerOrThrow(), ctx.getSource()))
+                .then(literal("pay")
+                        .then(argument("player", StringArgumentType.word())
+                                .suggests((ctx, builder) -> suggestPlayers(ctx.getSource(), builder))
+                                .then(argument("amount", LongArgumentType.longArg(1, EconomyManager.MAX))
+                                        .executes(ctx -> payShards(
+                                                ctx.getSource().getPlayerOrThrow(),
+                                                StringArgumentType.getString(ctx, "player"),
+                                                LongArgumentType.getLong(ctx, "amount"),
+                                                ctx.getSource())))))
+                .then(literal("top").executes(ctx -> shardTop(ctx.getSource())));
+    }
+
+    private static int showShardsSelf(ServerPlayerEntity player, ServerCommandSource source) {
+        EconomyManager mgr = EconomyCraft.getManager(source.getServer());
+        long s = mgr.getShards(player.getUuid(), true);
+        player.sendMessage(Text.literal("Shards: " + EconomyCraft.formatShards(s)).formatted(Formatting.LIGHT_PURPLE));
+        return 1;
+    }
+
+    private static int payShards(ServerPlayerEntity from, String target, long amount, ServerCommandSource source) {
+        var server = source.getServer();
+        EconomyManager manager = EconomyCraft.getManager(server);
+        ServerPlayerEntity toOnline = server.getPlayerManager().getPlayer(target);
+        UUID toId = toOnline != null ? toOnline.getUuid() : manager.tryResolveUuidByName(target);
+        if (toId == null) {
+            source.sendError(Text.literal("Unknown player").formatted(Formatting.RED));
+            return 0;
+        }
+        if (from.getUuid().equals(toId)) {
+            source.sendError(Text.literal("You cannot pay yourself").formatted(Formatting.RED));
+            return 0;
+        }
+        if (!manager.shardPay(from.getUuid(), toId, amount)) {
+            source.sendError(Text.literal("Not enough shards").formatted(Formatting.RED));
+            return 0;
+        }
+        String displayName = toOnline != null ? IdentityCompat.of(toOnline).name() : getDisplayName(manager, toId);
+        from.sendMessage(Text.literal("Sent " + EconomyCraft.formatShards(amount) + " to " + displayName)
+                .formatted(Formatting.LIGHT_PURPLE));
+        if (toOnline != null) {
+            toOnline.sendMessage(Text.literal(from.getName().getString() + " sent you " + EconomyCraft.formatShards(amount))
+                    .formatted(Formatting.LIGHT_PURPLE));
+        }
+        return 1;
+    }
+
+    private static int shardTop(ServerCommandSource source) {
+        if (!EconomyConfig.get().shardsEnabled) {
+            source.sendError(Text.literal("Shards are disabled.").formatted(Formatting.RED));
+            return 0;
+        }
+        EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        Map<UUID, Long> map = manager.getShardBalances();
+        if (map.isEmpty()) {
+            source.sendError(Text.literal("No shard balances yet.").formatted(Formatting.RED));
+            return 0;
+        }
+        var sorted = new ArrayList<>(map.entrySet());
+        sorted.sort((a, b) -> {
+            int c = Long.compare(b.getValue(), a.getValue());
+            if (c != 0) return c;
+            return String.CASE_INSENSITIVE_ORDER.compare(
+                    manager.getBestName(a.getKey()),
+                    manager.getBestName(b.getKey()));
+        });
+        int cap = EconomyConfig.get().baltopCount;
+        if (sorted.size() > cap) sorted = new ArrayList<>(sorted.subList(0, cap));
+        StringBuilder sb = new StringBuilder("Top shards:\n");
+        for (int i = 0; i < sorted.size(); i++) {
+            var e = sorted.get(i);
+            sb.append(i + 1).append(". ")
+                    .append(manager.getBestName(e.getKey()))
+                    .append(": ")
+                    .append(EconomyCraft.formatShards(e.getValue()));
+            if (i + 1 < sorted.size()) sb.append("\n");
+        }
+        Text msg = Text.literal(sb.toString()).formatted(Formatting.LIGHT_PURPLE);
+        try {
+            source.getPlayerOrThrow().sendMessage(msg);
+        } catch (Exception ex) {
+            source.sendFeedback(() -> msg, false);
+        }
+        return sorted.size();
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> buildCoinflipEco() {
+        return literal("coinflip")
+                .requires(s -> EconomyConfig.get().coinflipEnabled)
+                .then(literal("challenge")
+                        .then(argument("player", StringArgumentType.word())
+                                .suggests((ctx, builder) -> suggestPlayers(ctx.getSource(), builder))
+                                .then(argument("amount", LongArgumentType.longArg(1, EconomyManager.MAX))
+                                        .executes(ctx -> coinflipChallenge(
+                                                ctx.getSource().getPlayerOrThrow(),
+                                                StringArgumentType.getString(ctx, "player"),
+                                                LongArgumentType.getLong(ctx, "amount"),
+                                                ctx.getSource())))))
+                .then(literal("accept").executes(ctx -> coinflipAccept(ctx.getSource().getPlayerOrThrow(), ctx.getSource())))
+                .then(literal("cancel").executes(ctx -> coinflipCancel(ctx.getSource().getPlayerOrThrow(), ctx.getSource())));
+    }
+
+    private static int coinflipChallenge(ServerPlayerEntity challenger, String targetName, long amount, ServerCommandSource source) {
+        EconomyManager mgr = EconomyCraft.getManager(source.getServer());
+        ServerPlayerEntity target = source.getServer().getPlayerManager().getPlayer(targetName);
+        if (target == null) {
+            source.sendError(Text.literal("That player must be online.").formatted(Formatting.RED));
+            return 0;
+        }
+        String err = mgr.tryOfferCoinflip(challenger, target, amount);
+        if (err != null) {
+            source.sendError(Text.literal(err).formatted(Formatting.RED));
+            return 0;
+        }
+        challenger.sendMessage(Text.literal("Coinflip: waiting for " + target.getName().getString()
+                        + " to /eco coinflip accept (" + EconomyCraft.formatMoney(amount) + " each).")
+                .formatted(Formatting.GOLD));
+        target.sendMessage(Text.literal(challenger.getName().getString() + " wants a coinflip for "
+                        + EconomyCraft.formatMoney(amount) + "! Type /eco coinflip accept")
+                .formatted(Formatting.GOLD));
+        return 1;
+    }
+
+    private static int coinflipAccept(ServerPlayerEntity target, ServerCommandSource source) {
+        EconomyManager mgr = EconomyCraft.getManager(source.getServer());
+        EconomyManager.CoinflipAcceptResult res = mgr.tryAcceptCoinflip(target);
+        if (!res.ok()) {
+            target.sendMessage(Text.literal(res.errorMessage()).formatted(Formatting.RED));
+            return 0;
+        }
+        ServerPlayerEntity winner = source.getServer().getPlayerManager().getPlayer(res.winnerId());
+        ServerPlayerEntity loser = source.getServer().getPlayerManager().getPlayer(res.loserId());
+        String wName = winner != null ? winner.getName().getString() : mgr.getBestName(res.winnerId());
+        Text broadcast = Text.literal("Coinflip: " + wName + " won " + EconomyCraft.formatMoney(res.payout()) + "!")
+                .formatted(Formatting.GREEN);
+        if (winner != null) winner.sendMessage(broadcast);
+        if (loser != null && (winner == null || !loser.getUuid().equals(winner.getUuid()))) {
+            loser.sendMessage(broadcast);
+        }
+        return 1;
+    }
+
+    private static int coinflipCancel(ServerPlayerEntity challenger, ServerCommandSource source) {
+        EconomyManager mgr = EconomyCraft.getManager(source.getServer());
+        String err = mgr.tryCancelCoinflip(challenger);
+        if (err != null) {
+            source.sendError(Text.literal(err).formatted(Formatting.RED));
+            return 0;
+        }
+        challenger.sendMessage(Text.literal("Coinflip cancelled; your stake was returned.").formatted(Formatting.YELLOW));
+        return 1;
+    }
+
+    // =====================================================================
     // === Admin commands ==================================================
     // =====================================================================
 
@@ -324,11 +548,31 @@ public final class EconomyCommands {
                                         ctx.getSource()))));
     }
 
+    private static LiteralArgumentBuilder<ServerCommandSource> buildAddShards() {
+        return literal("addshards").requires(PermissionCompat.gamemaster())
+                .then(argument("targets", GameProfileArgumentType.gameProfile())
+                        .then(argument("amount", LongArgumentType.longArg(1, EconomyManager.MAX))
+                                .executes(ctx -> addShards(
+                                        IdentityCompat.getArgAsPlayerRefs(ctx, "targets"),
+                                        LongArgumentType.getLong(ctx, "amount"),
+                                        ctx.getSource()))));
+    }
+
     private static LiteralArgumentBuilder<ServerCommandSource> buildSetMoney() {
         return literal("setmoney").requires(PermissionCompat.gamemaster())
                 .then(argument("targets", GameProfileArgumentType.gameProfile())
                         .then(argument("amount", LongArgumentType.longArg(0, EconomyManager.MAX))
                                 .executes(ctx -> setMoney(
+                                        IdentityCompat.getArgAsPlayerRefs(ctx, "targets"),
+                                        LongArgumentType.getLong(ctx, "amount"),
+                                        ctx.getSource()))));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> buildSetShards() {
+        return literal("setshards").requires(PermissionCompat.gamemaster())
+                .then(argument("targets", GameProfileArgumentType.gameProfile())
+                        .then(argument("amount", LongArgumentType.longArg(0, EconomyManager.MAX))
+                                .executes(ctx -> setShards(
                                         IdentityCompat.getArgAsPlayerRefs(ctx, "targets"),
                                         LongArgumentType.getLong(ctx, "amount"),
                                         ctx.getSource()))));
@@ -407,6 +651,48 @@ public final class EconomyCommands {
         return count;
     }
 
+    private static int addShards(Collection<IdentityCompat.PlayerRef> profiles, long amount, ServerCommandSource source) {
+        if (!EconomyConfig.get().shardsEnabled) {
+            source.sendError(Text.literal("Shards are disabled.").formatted(Formatting.RED));
+            return 0;
+        }
+        if (profiles.isEmpty()) {
+            source.sendError(Text.literal("No targets matched").formatted(Formatting.RED));
+            return 0;
+        }
+        EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        ServerPlayerEntity executor;
+        try {
+            executor = source.getPlayerOrThrow();
+        } catch (Exception e) {
+            executor = null;
+        }
+        if (profiles.size() == 1) {
+            var p = profiles.iterator().next();
+            manager.addShards(p.id(), amount);
+            Text msg = Text.literal("Added " + EconomyCraft.formatShards(amount) + " to " + p.name() + ".")
+                    .formatted(Formatting.LIGHT_PURPLE);
+            if (executor != null) {
+                executor.sendMessage(msg);
+            } else {
+                source.sendFeedback(() -> msg, true);
+            }
+            return 1;
+        }
+        for (var p : profiles) {
+            manager.addShards(p.id(), amount);
+        }
+        int count = profiles.size();
+        Text msg = Text.literal("Added " + EconomyCraft.formatShards(amount) + " to " + count + " player(s).")
+                .formatted(Formatting.LIGHT_PURPLE);
+        if (executor != null) {
+            executor.sendMessage(msg);
+        } else {
+            source.sendFeedback(() -> msg, true);
+        }
+        return count;
+    }
+
     private static int setMoney(Collection<IdentityCompat.PlayerRef> profiles, long amount, ServerCommandSource source) {
         if (profiles.isEmpty()) {
             source.sendError(Text.literal("No targets matched").formatted(Formatting.RED));
@@ -455,6 +741,48 @@ public final class EconomyCommands {
             source.sendFeedback(() -> msg, true);
         }
 
+        return count;
+    }
+
+    private static int setShards(Collection<IdentityCompat.PlayerRef> profiles, long amount, ServerCommandSource source) {
+        if (!EconomyConfig.get().shardsEnabled) {
+            source.sendError(Text.literal("Shards are disabled.").formatted(Formatting.RED));
+            return 0;
+        }
+        if (profiles.isEmpty()) {
+            source.sendError(Text.literal("No targets matched").formatted(Formatting.RED));
+            return 0;
+        }
+        EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        ServerPlayerEntity executor;
+        try {
+            executor = source.getPlayerOrThrow();
+        } catch (Exception e) {
+            executor = null;
+        }
+        if (profiles.size() == 1) {
+            var p = profiles.iterator().next();
+            manager.setShards(p.id(), amount);
+            Text msg = Text.literal("Set shards for " + p.name() + " to " + EconomyCraft.formatShards(amount) + ".")
+                    .formatted(Formatting.LIGHT_PURPLE);
+            if (executor != null) {
+                executor.sendMessage(msg);
+            } else {
+                source.sendFeedback(() -> msg, true);
+            }
+            return 1;
+        }
+        for (var p : profiles) {
+            manager.setShards(p.id(), amount);
+        }
+        int count = profiles.size();
+        Text msg = Text.literal("Set shards to " + EconomyCraft.formatShards(amount) + " for " + count + " player(s).")
+                .formatted(Formatting.LIGHT_PURPLE);
+        if (executor != null) {
+            executor.sendMessage(msg);
+        } else {
+            source.sendFeedback(() -> msg, true);
+        }
         return count;
     }
 
@@ -798,13 +1126,34 @@ public final class EconomyCommands {
     private static int daily(ServerPlayerEntity player, ServerCommandSource source) {
         EconomyManager manager = EconomyCraft.getManager(source.getServer());
         if (manager.claimDaily(player.getUuid())) {
-            Text msg = Text.literal("Claimed " + EconomyCraft.formatMoney(EconomyConfig.get().dailyAmount))
-                    .formatted(Formatting.GREEN);
-            player.sendMessage(msg);
+            var msg = Text.literal("Claimed " + EconomyCraft.formatMoney(EconomyConfig.get().dailyAmount));
+            if (EconomyConfig.get().shardsEnabled && EconomyConfig.get().dailyShards > 0) {
+                msg.append(Text.literal(" + " + EconomyCraft.formatShards(EconomyConfig.get().dailyShards)));
+            }
+            player.sendMessage(msg.formatted(Formatting.GREEN));
         } else {
             source.sendError(Text.literal("Already claimed today").formatted(Formatting.RED));
         }
         return 1;
+    }
+
+    /** DonutSMP-style top-level command aliases when {@link EconomyConfig#donutStyleStandaloneAliases} is on. */
+    public static void registerDonutStyleAliases(CommandDispatcher<ServerCommandSource> dispatcher) {
+        if (!EconomyConfig.get().standaloneCommands || !EconomyConfig.get().donutStyleStandaloneAliases) {
+            return;
+        }
+        java.util.function.Predicate<ServerCommandSource> standalone = s -> EconomyConfig.get().standaloneCommands;
+        dispatcher.register(balanceBranch("balance").requires(standalone));
+        dispatcher.register(balanceBranch("money").requires(standalone));
+        dispatcher.register(literal("baltop").requires(standalone).executes(ctx -> balTop(ctx.getSource())));
+        dispatcher.register(buildLeaderboard().requires(standalone));
+        dispatcher.register(buildWorth().requires(standalone));
+        if (EconomyConfig.get().shardsEnabled) {
+            dispatcher.register(buildShardsEco().requires(standalone));
+        }
+        if (EconomyConfig.get().coinflipEnabled) {
+            dispatcher.register(buildCoinflipEco().requires(standalone));
+        }
     }
 
     // =====================================================================

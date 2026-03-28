@@ -19,6 +19,7 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDate;
 
 public class EconomyManager {
@@ -28,10 +29,12 @@ public class EconomyManager {
 
     private final MinecraftServer server;
     private final Path file;
+    private final Path shardsFile;
     private final Path dailyFile;
     private final Path dailySellFile;
 
     private final Map<UUID, Long> balances = new HashMap<>();
+    private final Map<UUID, Long> shards = new HashMap<>();
     private final Map<UUID, Long> lastDaily = new HashMap<>();
     private final Map<UUID, DailySellData> dailySells = new HashMap<>();
     private Map<UUID, String> diskUserCache = null;
@@ -40,9 +43,25 @@ public class EconomyManager {
     private ScoreboardObjective objective;
     private final com.reazip.economycraft.shop.ShopManager shop;
     private final com.reazip.economycraft.orders.OrderManager orders;
+    private final com.reazip.economycraft.playervault.PlayerVaultManager playerVaults;
     private final Set<UUID> displayed = new HashSet<>();
 
+    /** Target player (who must /eco coinflip accept) -> pending offer. */
+    private final Map<UUID, CoinflipOffer> coinflipPending = new ConcurrentHashMap<>();
+
     public static final long MAX = 999_999_999L;
+
+    public record CoinflipOffer(UUID challengerId, long amount, long expiryEpochMs) {}
+
+    public record CoinflipAcceptResult(boolean ok, String errorMessage, UUID winnerId, UUID loserId, long payout) {
+        public static CoinflipAcceptResult fail(String m) {
+            return new CoinflipAcceptResult(false, m, null, null, 0L);
+        }
+
+        public static CoinflipAcceptResult ok(UUID winner, UUID loser, long payout) {
+            return new CoinflipAcceptResult(true, null, winner, loser, payout);
+        }
+    }
 
     public EconomyManager(MinecraftServer server) {
         this.server = server;
@@ -51,15 +70,18 @@ public class EconomyManager {
         try { Files.createDirectories(dataDir); } catch (IOException ignored) {}
 
         this.file = dataDir.resolve("balances.json");
+        this.shardsFile = dataDir.resolve("shards.json");
         this.dailyFile = dataDir.resolve("daily.json");
         this.dailySellFile = dataDir.resolve("daily_sells.json");
 
         load();
+        loadShards();
         loadDaily();
         loadDailySells();
 
         this.shop = new com.reazip.economycraft.shop.ShopManager(server);
         this.orders = new com.reazip.economycraft.orders.OrderManager(server);
+        this.playerVaults = new com.reazip.economycraft.playervault.PlayerVaultManager(server);
 
         applyScoreboardSettingOnStartup();
         this.prices = new PriceRegistry(server);
@@ -170,6 +192,175 @@ public class EconomyManager {
     }
 
     // =====================================================================
+    // === Shards (secondary currency) ======================================
+    // =====================================================================
+
+    public long getShards(UUID player, boolean createIfMissing) {
+        if (!EconomyConfig.get().shardsEnabled) {
+            return 0L;
+        }
+        if (!shards.containsKey(player)) {
+            if (createIfMissing) {
+                long v = clampShard(EconomyConfig.get().startingShards);
+                shards.put(player, v);
+                saveShards();
+                return v;
+            }
+            return 0L;
+        }
+        return shards.get(player);
+    }
+
+    public void addShards(UUID player, long amount) {
+        if (!EconomyConfig.get().shardsEnabled || amount == 0) return;
+        long cur = getShards(player, true);
+        shards.put(player, clampShard(cur + amount));
+        saveShards();
+    }
+
+    public boolean removeShards(UUID player, long amount) {
+        if (!EconomyConfig.get().shardsEnabled) return false;
+        long cur = getShards(player, true);
+        if (cur < amount) return false;
+        shards.put(player, clampShard(cur - amount));
+        saveShards();
+        return true;
+    }
+
+    public boolean shardPay(UUID from, UUID to, long amount) {
+        if (!removeShards(from, amount)) return false;
+        addShards(to, amount);
+        return true;
+    }
+
+    public Map<UUID, Long> getShardBalances() {
+        return Collections.unmodifiableMap(shards);
+    }
+
+    public void setShards(UUID player, long amount) {
+        if (!EconomyConfig.get().shardsEnabled) return;
+        shards.put(player, clampShard(amount));
+        saveShards();
+    }
+
+    private long clampShard(long value) {
+        return Math.max(0L, Math.min(MAX, value));
+    }
+
+    private void loadShards() {
+        if (!Files.exists(shardsFile)) return;
+        try {
+            String json = Files.readString(shardsFile);
+            Map<UUID, Double> map = GSON.fromJson(json, new TypeToken<Map<UUID, Double>>(){}.getType());
+            if (map != null) {
+                for (Map.Entry<UUID, Double> e : map.entrySet()) {
+                    shards.put(e.getKey(), clampShard(e.getValue().longValue()));
+                }
+            }
+        } catch (IOException ignored) {}
+    }
+
+    private void saveShards() {
+        if (!EconomyConfig.get().shardsEnabled) return;
+        try {
+            String json = GSON.toJson(new HashMap<>(shards), TYPE);
+            Files.writeString(shardsFile, json);
+        } catch (IOException ignored) {}
+    }
+
+    // =====================================================================
+    // === Coinflip (money wager) ===========================================
+    // =====================================================================
+
+    public void purgeExpiredCoinflips() {
+        long now = System.currentTimeMillis();
+        for (var it = coinflipPending.entrySet().iterator(); it.hasNext(); ) {
+            var e = it.next();
+            if (e.getValue().expiryEpochMs() < now) {
+                addMoney(e.getValue().challengerId(), e.getValue().amount());
+                it.remove();
+            }
+        }
+    }
+
+    /**
+     * @return null on success, or error message
+     */
+    @Nullable
+    public String tryOfferCoinflip(ServerPlayerEntity challenger, ServerPlayerEntity target, long amount) {
+        if (!EconomyConfig.get().coinflipEnabled) {
+            return "Coinflip is disabled.";
+        }
+        if (amount < 1 || amount > MAX) {
+            return "Invalid amount.";
+        }
+        if (challenger.getUuid().equals(target.getUuid())) {
+            return "You cannot coinflip yourself.";
+        }
+        purgeExpiredCoinflips();
+        if (coinflipPending.containsKey(target.getUuid())) {
+            return "That player already has a pending coinflip.";
+        }
+        if (!removeMoney(challenger.getUuid(), amount)) {
+            return "You cannot afford that.";
+        }
+        long timeoutMs = EconomyConfig.get().coinflipTimeoutSeconds * 1000L;
+        coinflipPending.put(target.getUuid(), new CoinflipOffer(challenger.getUuid(), amount, System.currentTimeMillis() + timeoutMs));
+        return null;
+    }
+
+    public CoinflipAcceptResult tryAcceptCoinflip(ServerPlayerEntity target) {
+        if (!EconomyConfig.get().coinflipEnabled) {
+            return CoinflipAcceptResult.fail("Coinflip is disabled.");
+        }
+        purgeExpiredCoinflips();
+        CoinflipOffer offer = coinflipPending.remove(target.getUuid());
+        if (offer == null) {
+            return CoinflipAcceptResult.fail("You have no pending coinflip.");
+        }
+        if (System.currentTimeMillis() > offer.expiryEpochMs()) {
+            addMoney(offer.challengerId(), offer.amount());
+            return CoinflipAcceptResult.fail("That coinflip expired; the challenger was refunded.");
+        }
+        if (!removeMoney(target.getUuid(), offer.amount())) {
+            addMoney(offer.challengerId(), offer.amount());
+            return CoinflipAcceptResult.fail("You cannot afford that stake; the challenger was refunded.");
+        }
+        long pot = 2L * offer.amount();
+        double tax = EconomyConfig.get().coinflipTaxRate;
+        long taxAmt = (long) Math.floor(pot * tax);
+        long payout = clamp(pot - taxAmt);
+        boolean challengerWins = server.getOverworld().getRandom().nextBoolean();
+        UUID winner = challengerWins ? offer.challengerId() : target.getUuid();
+        UUID loser = challengerWins ? target.getUuid() : offer.challengerId();
+        addMoney(winner, payout);
+        return CoinflipAcceptResult.ok(winner, loser, payout);
+    }
+
+    /**
+     * Challenger cancels their outgoing offer (refund if still waiting on this target).
+     */
+    @Nullable
+    public String tryCancelCoinflip(ServerPlayerEntity challenger) {
+        purgeExpiredCoinflips();
+        for (var it = coinflipPending.entrySet().iterator(); it.hasNext(); ) {
+            var e = it.next();
+            if (e.getValue().challengerId().equals(challenger.getUuid())) {
+                addMoney(challenger.getUuid(), e.getValue().amount());
+                it.remove();
+                return null;
+            }
+        }
+        return "You have no pending coinflip to cancel.";
+    }
+
+    @Nullable
+    public CoinflipOffer peekCoinflipFor(ServerPlayerEntity target) {
+        purgeExpiredCoinflips();
+        return coinflipPending.get(target.getUuid());
+    }
+
+    // =====================================================================
     // === Load / Save =====================================================
     // =====================================================================
 
@@ -203,6 +394,8 @@ public class EconomyManager {
             String json = GSON.toJson(dailySells, DAILY_SELL_TYPE);
             Files.writeString(dailySellFile, json);
         } catch (IOException ignored) {}
+
+        saveShards();
     }
 
     private void loadDaily() {
@@ -349,12 +542,18 @@ public class EconomyManager {
         return prices;
     }
 
+    public com.reazip.economycraft.playervault.PlayerVaultManager getPlayerVaults() {
+        return playerVaults;
+    }
+
     public Map<UUID, Long> getBalances() {
         return balances;
     }
 
     public void removePlayer(UUID id) {
         balances.remove(id);
+        shards.remove(id);
+        playerVaults.removePlayer(id);
         updateLeaderboard();
         save();
     }
@@ -365,6 +564,9 @@ public class EconomyManager {
         if (last == today) return false;
         lastDaily.put(player, today);
         addMoney(player, EconomyConfig.get().dailyAmount);
+        if (EconomyConfig.get().shardsEnabled && EconomyConfig.get().dailyShards > 0) {
+            addShards(player, EconomyConfig.get().dailyShards);
+        }
         return true;
     }
 
@@ -401,27 +603,34 @@ public class EconomyManager {
     }
 
     public void handlePvpKill(ServerPlayerEntity victim, ServerPlayerEntity killer) {
-        double pct = EconomyConfig.get().pvpBalanceLossPercentage;
-        if (pct <= 0.0) return;
         if (victim == null || killer == null) return;
         if (victim.getUuid().equals(killer.getUuid())) return;
 
-        long victimBal = getBalance(victim.getUuid(), true);
-        if (victimBal <= 0L) return;
+        double pct = EconomyConfig.get().pvpBalanceLossPercentage;
+        if (pct > 0.0) {
+            long victimBal = getBalance(victim.getUuid(), true);
+            if (victimBal > 0L) {
+                long loss = (long) Math.floor(pct * victimBal);
+                if (loss > 0L) {
+                    removeMoney(victim.getUuid(), loss);
+                    addMoney(killer.getUuid(), loss);
 
-        long loss = (long)Math.floor(pct * victimBal);
-        if (loss <= 0L) return;
+                    victim.sendMessage(Text.literal(
+                                    "You lost " + EconomyCraft.formatMoney(loss) + " for being killed by " + killer.getName().getString())
+                            .formatted(net.minecraft.util.Formatting.RED));
 
-        removeMoney(victim.getUuid(), loss);
-        addMoney(killer.getUuid(), loss);
+                    killer.sendMessage(Text.literal(
+                                    "You received " + EconomyCraft.formatMoney(loss) + " for killing " + victim.getName().getString())
+                            .formatted(net.minecraft.util.Formatting.GREEN));
+                }
+            }
+        }
 
-        victim.sendMessage(Text.literal(
-                        "You lost " + EconomyCraft.formatMoney(loss) + " for being killed by " + killer.getName().getString())
-                .formatted(net.minecraft.util.Formatting.RED));
-
-        killer.sendMessage(Text.literal(
-                        "You received " + EconomyCraft.formatMoney(loss) + " for killing " + victim.getName().getString())
-                .formatted(net.minecraft.util.Formatting.GREEN));
+        if (EconomyConfig.get().shardsEnabled && EconomyConfig.get().shardsPerPlayerKill > 0) {
+            addShards(killer.getUuid(), EconomyConfig.get().shardsPerPlayerKill);
+            killer.sendMessage(Text.literal("+" + EconomyConfig.get().shardsPerPlayerKill + " shards")
+                    .formatted(net.minecraft.util.Formatting.LIGHT_PURPLE));
+        }
     }
 
     private long clamp(long value) {

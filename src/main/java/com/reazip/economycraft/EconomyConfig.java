@@ -34,6 +34,68 @@ public class EconomyConfig {
     @SerializedName("server_shop_enabled")
     public boolean serverShopEnabled = true;
 
+    @SerializedName("compact_money_display")
+    public boolean compactMoneyDisplay;
+
+    @SerializedName("player_vault_enabled")
+    public boolean playerVaultEnabled = true;
+
+    @SerializedName("player_vault_require_permission")
+    public boolean playerVaultRequirePermission;
+
+    /** Chest rows per vault (1 to 6). */
+    @SerializedName("player_vault_rows")
+    public int playerVaultRows = 6;
+
+    /** Vaults available when LuckPerms meta is absent (or LP not installed). */
+    @SerializedName("player_vault_default_amount")
+    public int playerVaultDefaultAmount = 1;
+
+    /** Hard cap on how many numbered vaults a player may open. */
+    @SerializedName("player_vault_max_amount")
+    public int playerVaultMaxAmount = 54;
+
+    /**
+     * LuckPerms meta key holding the max vault count (integer string), e.g. {@code economycraft.playervault.amount}.
+     */
+    @SerializedName("player_vault_luckperms_meta_key")
+    public String playerVaultLuckPermsMetaKey = "economycraft.playervault.amount";
+
+    // --- DonutSMP-style extras ------------------------------------------------
+
+    /** Register /balance, /money, /baltop, /leaderboard, /worth when standalone_commands is on. */
+    @SerializedName("donut_style_standalone_aliases")
+    public boolean donutStyleStandaloneAliases = true;
+
+    /** Secondary currency (DonutSMP-style shards). */
+    @SerializedName("shards_enabled")
+    public boolean shardsEnabled = true;
+
+    @SerializedName("starting_shards")
+    public long startingShards;
+
+    /** Shards granted to the killer on player kill (0 to disable). */
+    @SerializedName("shards_per_player_kill")
+    public long shardsPerPlayerKill = 10L;
+
+    /** Shards included with /eco daily (0 to disable). */
+    @SerializedName("daily_shards")
+    public long dailyShards;
+
+    /** Money PvP coinflip: stake held until accept or timeout. */
+    @SerializedName("coinflip_enabled")
+    public boolean coinflipEnabled = true;
+
+    @SerializedName("coinflip_tax_rate")
+    public double coinflipTaxRate;
+
+    @SerializedName("coinflip_timeout_seconds")
+    public int coinflipTimeoutSeconds = 120;
+
+    /** How many players /eco bal top and shard tops show. */
+    @SerializedName("baltop_count")
+    public int baltopCount = 10;
+
     private static EconomyConfig INSTANCE = new EconomyConfig();
     private static Path file;
 
@@ -59,8 +121,50 @@ public class EconomyConfig {
                 throw new IllegalStateException("config.json parsed to null");
             }
             INSTANCE = parsed;
+            INSTANCE.normalizeAfterLoad();
         } catch (Exception e) {
             throw new IllegalStateException("[EconomyCraft] Failed to read/parse config.json at " + file, e);
+        }
+    }
+
+    private void normalizeAfterLoad() {
+        if (playerVaultLuckPermsMetaKey == null || playerVaultLuckPermsMetaKey.isBlank()) {
+            playerVaultLuckPermsMetaKey = "economycraft.playervault.amount";
+        }
+        if (playerVaultRows < 1) {
+            playerVaultRows = 1;
+        } else if (playerVaultRows > 6) {
+            playerVaultRows = 6;
+        }
+        if (playerVaultDefaultAmount < 0) {
+            playerVaultDefaultAmount = 0;
+        }
+        if (playerVaultMaxAmount < 1) {
+            playerVaultMaxAmount = 54;
+        }
+        if (startingShards < 0) {
+            startingShards = 0;
+        }
+        if (shardsPerPlayerKill < 0) {
+            shardsPerPlayerKill = 0;
+        }
+        if (dailyShards < 0) {
+            dailyShards = 0;
+        }
+        if (coinflipTaxRate < 0) {
+            coinflipTaxRate = 0;
+        } else if (coinflipTaxRate > 1) {
+            coinflipTaxRate = 1;
+        }
+        if (coinflipTimeoutSeconds < 10) {
+            coinflipTimeoutSeconds = 10;
+        } else if (coinflipTimeoutSeconds > 600) {
+            coinflipTimeoutSeconds = 600;
+        }
+        if (baltopCount < 1) {
+            baltopCount = 1;
+        } else if (baltopCount > 50) {
+            baltopCount = 50;
         }
     }
 
