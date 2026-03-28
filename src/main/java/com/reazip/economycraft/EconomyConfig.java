@@ -42,7 +42,7 @@ public class EconomyConfig {
     }
 
     public static void load(MinecraftServer server) {
-        Path dir = server != null ? server.getFile("config/economycraft") : Path.of("config/economycraft");
+        Path dir = server != null ? server.getRunDirectory().resolve("config").resolve("economycraft") : Path.of("config/economycraft");
         try { Files.createDirectories(dir); } catch (IOException ignored) {}
         file = dir.resolve("config.json");
 
