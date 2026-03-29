@@ -2,7 +2,8 @@ package com.palordersoftworks.brokenstarsmpmod.initiaters;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
-import com.reazip.economycraft.EconomyCraft;
+import com.palordersoftworks.economycraft.EconomyCraft;
+import com.palordersoftworks.economycraft.wand.SellWand;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -71,11 +72,11 @@ public class DropAtFeet implements ModInitializer {
 
             ItemStack stack = sp.getStackInHand(hand);
 
-            if (!com.reazip.economycraft.wand.SellWand.isSellWand(stack)) {
+            if (!SellWand.isSellWand(stack)) {
                 return ActionResult.PASS;
             }
 
-            com.reazip.economycraft.wand.SellWand.use(
+            SellWand.use(
                     sp,
                     sp.getCommandSource()
             );
