@@ -1,10 +1,9 @@
 package com.palordersoftworks.economycraft.util;
 
-import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.item.Items;
+import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -41,16 +40,9 @@ public final class IdentifierCompat {
         Method holderValue = null;
         Method eitherLeft = null;
         Method eitherRight = null;
-        Object sample = Registries.ITEM.getKey(Items.AIR);
-        if (sample == null) {
-            throw new ExceptionInInitializerError("Identifier sample not found");
-        }
-
-        Object idSample = extractIdentifierSample(sample);
-        if (idSample == null) {
-            throw new ExceptionInInitializerError("Identifier sample not found");
-        }
-
+        // 1.21+: Registry.getKey(T) returns Optional<RegistryKey<T>>; Identifier constructors are private.
+        // Use a vanilla id sample so we resolve Identifier.of / tryParse via reflection reliably.
+        Object idSample = Identifier.of("minecraft", "air");
         idClass = idSample.getClass();
         for (Constructor<?> constructor : idClass.getConstructors()) {
             Class<?>[] params = constructor.getParameterTypes();
@@ -404,25 +396,6 @@ public final class IdentifierCompat {
         } catch (ClassNotFoundException | NoSuchMethodException e) {
             return null;
         }
-    }
-
-    private static Object extractIdentifierSample(Object sample) {
-        if (sample == null) {
-            return null;
-        }
-        Class<?> sampleClass = sample.getClass();
-        for (String methodName : new String[] {"location", "identifier"}) {
-            try {
-                Method method = sampleClass.getMethod(methodName);
-                Object id = method.invoke(sample);
-                if (id != null) {
-                    return id;
-                }
-            } catch (ReflectiveOperationException ignored) {
-                // try next name
-            }
-        }
-        return sample;
     }
 
     private static Object invokeStatic(Method method, Object... args) {
