@@ -1,4 +1,4 @@
-package com.reazip.economycraft.util;
+package com.palordersoftworks.economycraft.util;
 
 import net.minecraft.server.command.ServerCommandSource;
 

@@ -1,4 +1,4 @@
-package com.reazip.economycraft;
+package com.palordersoftworks.economycraft;
 
 import com.google.gson.*;
 import com.google.gson.annotations.SerializedName;
@@ -12,9 +12,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.Map;
 
-public class EconomyConfig {
+/**
+ * Runtime economy settings loaded from {@code run/config/}{@value #CONFIG_FOLDER_NAME}{@code /config.json}.
+ */
+public final class EconomyConfig {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final String DEFAULT_RESOURCE_PATH = "/assets/economycraft/config.json";
+
+    /**
+     * Subdirectory under the server {@code config/} folder for this mod's {@code config.json}, shop data, prices, etc.
+     */
+    public static final String CONFIG_FOLDER_NAME = "economycraft";
+
+    private static final String LOG_PREFIX = "[PalorderEconomy]";
+    private static final String DEFAULT_RESOURCE_PATH = "/assets/palordersoftworks/economycraft/config.json";
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .create();
@@ -56,18 +66,21 @@ public class EconomyConfig {
     public int playerVaultMaxAmount = 54;
 
     /**
-     * LuckPerms meta key holding the max vault count (integer string), e.g. {@code economycraft.playervault.amount}.
+     * LuckPerms meta key holding the max vault count (integer string), e.g. {@code brokenstarsmp.economy.playervault.amount}.
      */
     @SerializedName("player_vault_luckperms_meta_key")
-    public String playerVaultLuckPermsMetaKey = "economycraft.playervault.amount";
+    public String playerVaultLuckPermsMetaKey = "brokenstarsmp.economy.playervault.amount";
 
-    // --- DonutSMP-style extras ------------------------------------------------
+    // --- Optional top-level command aliases ------------------------------------
 
-    /** Register /balance, /money, /baltop, /leaderboard, /worth when standalone_commands is on. */
-    @SerializedName("donut_style_standalone_aliases")
-    public boolean donutStyleStandaloneAliases = true;
+    /**
+     * When {@link #standaloneCommands} is true, also register /money, /baltop, /leaderboard, /worth, etc.
+     * ({@code /balance} and {@code /bal} are always registered when standalone is on.)
+     */
+    @SerializedName(value = "extra_standalone_aliases", alternate = {"donut_style_standalone_aliases"})
+    public boolean extraStandaloneAliases = true;
 
-    /** Secondary currency (DonutSMP-style shards). */
+    /** Secondary currency (shards). */
     @SerializedName("shards_enabled")
     public boolean shardsEnabled = true;
 
@@ -92,7 +105,7 @@ public class EconomyConfig {
     @SerializedName("coinflip_timeout_seconds")
     public int coinflipTimeoutSeconds = 120;
 
-    /** How many players /eco bal top and shard tops show. */
+    /** How many players /eco balance top and shard tops show. */
     @SerializedName("baltop_count")
     public int baltopCount = 10;
 
@@ -104,8 +117,13 @@ public class EconomyConfig {
     }
 
     public static void load(MinecraftServer server) {
-        Path dir = server != null ? server.getRunDirectory().resolve("config").resolve("economycraft") : Path.of("config/economycraft");
-        try { Files.createDirectories(dir); } catch (IOException ignored) {}
+        Path dir = server != null
+                ? server.getRunDirectory().resolve("config").resolve(CONFIG_FOLDER_NAME)
+                : Path.of("config").resolve(CONFIG_FOLDER_NAME);
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException ignored) {
+        }
         file = dir.resolve("config.json");
 
         if (Files.notExists(file)) {
@@ -123,13 +141,13 @@ public class EconomyConfig {
             INSTANCE = parsed;
             INSTANCE.normalizeAfterLoad();
         } catch (Exception e) {
-            throw new IllegalStateException("[EconomyCraft] Failed to read/parse config.json at " + file, e);
+            throw new IllegalStateException(LOG_PREFIX + " Failed to read/parse config.json at " + file, e);
         }
     }
 
     private void normalizeAfterLoad() {
         if (playerVaultLuckPermsMetaKey == null || playerVaultLuckPermsMetaKey.isBlank()) {
-            playerVaultLuckPermsMetaKey = "economycraft.playervault.amount";
+            playerVaultLuckPermsMetaKey = "brokenstarsmp.economy.playervault.amount";
         }
         if (playerVaultRows < 1) {
             playerVaultRows = 1;
@@ -170,7 +188,7 @@ public class EconomyConfig {
 
     public static void save() {
         if (file == null) {
-            throw new IllegalStateException("[EconomyCraft] EconomyConfig not initialized. Call load() first.");
+            throw new IllegalStateException(LOG_PREFIX + " EconomyConfig not initialized. Call load() first.");
         }
         try {
             Files.writeString(
@@ -181,7 +199,7 @@ public class EconomyConfig {
                     StandardOpenOption.TRUNCATE_EXISTING
             );
         } catch (IOException e) {
-            throw new IllegalStateException("[EconomyCraft] Failed to save config.json at " + file, e);
+            throw new IllegalStateException(LOG_PREFIX + " Failed to save config.json at " + file, e);
         }
     }
 
@@ -189,21 +207,21 @@ public class EconomyConfig {
         try (InputStream in = EconomyConfig.class.getResourceAsStream(DEFAULT_RESOURCE_PATH)) {
             if (in == null) {
                 throw new IllegalStateException(
-                        "[EconomyCraft] Missing bundled default " + DEFAULT_RESOURCE_PATH +
-                                " (did you forget to include it in resources?)"
+                        LOG_PREFIX + " Missing bundled default " + DEFAULT_RESOURCE_PATH
+                                + " (did you forget to include it in resources?)"
                 );
             }
             Files.copy(in, file, StandardCopyOption.REPLACE_EXISTING);
-            LOGGER.info("[EconomyCraft] Created {} from bundled default {}", file, DEFAULT_RESOURCE_PATH);
+            LOGGER.info("{} Created {} from bundled default {}", LOG_PREFIX, file, DEFAULT_RESOURCE_PATH);
         } catch (IOException e) {
-            throw new IllegalStateException("[EconomyCraft] Failed to create config.json at " + file, e);
+            throw new IllegalStateException(LOG_PREFIX + " Failed to create config.json at " + file, e);
         }
     }
 
     private static void mergeNewDefaultsFromBundledDefault() {
         JsonObject defaults = readBundledDefaultJson();
         if (defaults == null) {
-            LOGGER.warn("[EconomyCraft] No bundled defaults found; skipping config merge.");
+            LOGGER.warn("{} No bundled defaults found; skipping config merge.", LOG_PREFIX);
             return;
         }
 
@@ -212,12 +230,12 @@ public class EconomyConfig {
             String json = Files.readString(file, StandardCharsets.UTF_8);
             JsonElement parsed = JsonParser.parseString(json);
             if (!parsed.isJsonObject()) {
-                LOGGER.warn("[EconomyCraft] config.json root is not an object, skipping merge.");
+                LOGGER.warn("{} config.json root is not an object, skipping merge.", LOG_PREFIX);
                 return;
             }
             userRoot = parsed.getAsJsonObject();
         } catch (Exception ex) {
-            throw new IllegalStateException("[EconomyCraft] Failed to read/parse user config.json for merge at " + file, ex);
+            throw new IllegalStateException(LOG_PREFIX + " Failed to read/parse user config.json for merge at " + file, ex);
         }
 
         int[] added = new int[]{0};
@@ -227,22 +245,26 @@ public class EconomyConfig {
             try {
                 Files.writeString(file, GSON.toJson(userRoot), StandardCharsets.UTF_8);
             } catch (IOException ex) {
-                throw new IllegalStateException("[EconomyCraft] Failed to write merged config.json at " + file, ex);
+                throw new IllegalStateException(LOG_PREFIX + " Failed to write merged config.json at " + file, ex);
             }
         }
     }
 
     private static JsonObject readBundledDefaultJson() {
         try (InputStream in = EconomyConfig.class.getResourceAsStream(DEFAULT_RESOURCE_PATH)) {
-            if (in == null) return null;
+            if (in == null) {
+                return null;
+            }
 
             String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             JsonElement parsed = JsonParser.parseString(json);
-            if (!parsed.isJsonObject()) return null;
+            if (!parsed.isJsonObject()) {
+                return null;
+            }
 
             return parsed.getAsJsonObject();
         } catch (Exception ex) {
-            throw new IllegalStateException("[EconomyCraft] Failed to read bundled default config.json from " + DEFAULT_RESOURCE_PATH, ex);
+            throw new IllegalStateException(LOG_PREFIX + " Failed to read bundled default config.json from " + DEFAULT_RESOURCE_PATH, ex);
         }
     }
 

@@ -1,11 +1,11 @@
-package com.reazip.economycraft;
+package com.palordersoftworks.economycraft;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.reazip.economycraft.PriceRegistry.ResolvedPrice;
-import com.reazip.economycraft.util.ChatCompat;
-import com.reazip.economycraft.util.IdentifierCompat;
+import com.palordersoftworks.economycraft.PriceRegistry.ResolvedPrice;
+import com.palordersoftworks.economycraft.util.ChatCompat;
+import com.palordersoftworks.economycraft.util.IdentifierCompat;
 import net.minecraft.util.Formatting;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.text.ClickEvent;

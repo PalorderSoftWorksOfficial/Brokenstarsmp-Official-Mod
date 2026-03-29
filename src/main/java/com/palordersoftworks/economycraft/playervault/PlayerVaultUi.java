@@ -1,7 +1,7 @@
-package com.reazip.economycraft.playervault;
+package com.palordersoftworks.economycraft.playervault;
 
-import com.reazip.economycraft.EconomyConfig;
-import com.reazip.economycraft.EconomyManager;
+import com.palordersoftworks.economycraft.EconomyConfig;
+import com.palordersoftworks.economycraft.EconomyManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;

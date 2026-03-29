@@ -1,4 +1,4 @@
-package com.reazip.economycraft.playervault;
+package com.palordersoftworks.economycraft.playervault;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -7,6 +7,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.palordersoftworks.economycraft.EconomyConfig;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.inventory.SimpleInventory;
@@ -36,7 +37,7 @@ public final class PlayerVaultManager {
 
     public PlayerVaultManager(MinecraftServer server) {
         this.server = server;
-        Path dir = server.getRunDirectory().resolve("config").resolve("economycraft").resolve("data");
+        Path dir = server.getRunDirectory().resolve("config").resolve(EconomyConfig.CONFIG_FOLDER_NAME).resolve("data");
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {

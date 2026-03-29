@@ -1,8 +1,8 @@
-package com.reazip.economycraft;
+package com.palordersoftworks.economycraft;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.reazip.economycraft.util.IdentityCompat;
+import com.palordersoftworks.economycraft.util.IdentityCompat;
 import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.scoreboard.ScoreboardCriterion;
 import net.minecraft.scoreboard.ScoreboardDisplaySlot;
@@ -41,9 +41,9 @@ public class EconomyManager {
     private final PriceRegistry prices;
 
     private ScoreboardObjective objective;
-    private final com.reazip.economycraft.shop.ShopManager shop;
-    private final com.reazip.economycraft.orders.OrderManager orders;
-    private final com.reazip.economycraft.playervault.PlayerVaultManager playerVaults;
+    private final com.palordersoftworks.economycraft.shop.ShopManager shop;
+    private final com.palordersoftworks.economycraft.orders.OrderManager orders;
+    private final com.palordersoftworks.economycraft.playervault.PlayerVaultManager playerVaults;
     private final Set<UUID> displayed = new HashSet<>();
 
     /** Target player (who must /eco coinflip accept) -> pending offer. */
@@ -65,7 +65,7 @@ public class EconomyManager {
 
     public EconomyManager(MinecraftServer server) {
         this.server = server;
-        Path dir = server.getRunDirectory().resolve("config").resolve("economycraft");
+        Path dir = server.getRunDirectory().resolve("config").resolve(EconomyConfig.CONFIG_FOLDER_NAME);
         Path dataDir = dir.resolve("data");
         try { Files.createDirectories(dataDir); } catch (IOException ignored) {}
 
@@ -79,9 +79,9 @@ public class EconomyManager {
         loadDaily();
         loadDailySells();
 
-        this.shop = new com.reazip.economycraft.shop.ShopManager(server);
-        this.orders = new com.reazip.economycraft.orders.OrderManager(server);
-        this.playerVaults = new com.reazip.economycraft.playervault.PlayerVaultManager(server);
+        this.shop = new com.palordersoftworks.economycraft.shop.ShopManager(server);
+        this.orders = new com.palordersoftworks.economycraft.orders.OrderManager(server);
+        this.playerVaults = new com.palordersoftworks.economycraft.playervault.PlayerVaultManager(server);
 
         applyScoreboardSettingOnStartup();
         this.prices = new PriceRegistry(server);
@@ -530,11 +530,11 @@ public class EconomyManager {
     // === Misc ============================================================
     // =====================================================================
 
-    public com.reazip.economycraft.shop.ShopManager getShop() {
+    public com.palordersoftworks.economycraft.shop.ShopManager getShop() {
         return shop;
     }
 
-    public com.reazip.economycraft.orders.OrderManager getOrders() {
+    public com.palordersoftworks.economycraft.orders.OrderManager getOrders() {
         return orders;
     }
 
@@ -542,7 +542,7 @@ public class EconomyManager {
         return prices;
     }
 
-    public com.reazip.economycraft.playervault.PlayerVaultManager getPlayerVaults() {
+    public com.palordersoftworks.economycraft.playervault.PlayerVaultManager getPlayerVaults() {
         return playerVaults;
     }
 

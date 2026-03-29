@@ -1,11 +1,11 @@
-package com.reazip.economycraft.orders;
+package com.palordersoftworks.economycraft.orders;
 
-import com.reazip.economycraft.EconomyCraft;
-import com.reazip.economycraft.EconomyConfig;
-import com.reazip.economycraft.EconomyManager;
-import com.reazip.economycraft.util.ChatCompat;
-import com.reazip.economycraft.util.IdentityCompat;
-import com.reazip.economycraft.util.ProfileComponentCompat;
+import com.palordersoftworks.economycraft.EconomyCraft;
+import com.palordersoftworks.economycraft.EconomyConfig;
+import com.palordersoftworks.economycraft.EconomyManager;
+import com.palordersoftworks.economycraft.util.ChatCompat;
+import com.palordersoftworks.economycraft.util.IdentityCompat;
+import com.palordersoftworks.economycraft.util.ProfileComponentCompat;
 import net.minecraft.util.Formatting;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;

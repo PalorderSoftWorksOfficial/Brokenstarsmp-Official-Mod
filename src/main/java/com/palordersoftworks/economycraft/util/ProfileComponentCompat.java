@@ -1,4 +1,4 @@
-package com.reazip.economycraft.util;
+package com.palordersoftworks.economycraft.util;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.component.type.ProfileComponent;

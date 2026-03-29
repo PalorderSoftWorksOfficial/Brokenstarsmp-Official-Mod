@@ -1,9 +1,9 @@
-package com.reazip.economycraft.util;
+package com.palordersoftworks.economycraft.util;
 
 import net.minecraft.text.ClickEvent;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
-import com.reazip.economycraft.util.PermissionCompat;
+import com.palordersoftworks.economycraft.util.PermissionCompat;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;

@@ -1,8 +1,8 @@
-package com.reazip.economycraft.wand;
+package com.palordersoftworks.economycraft.wand;
 
-import com.reazip.economycraft.EconomyCraft;
-import com.reazip.economycraft.EconomyManager;
-import com.reazip.economycraft.PriceRegistry;
+import com.palordersoftworks.economycraft.EconomyCraft;
+import com.palordersoftworks.economycraft.EconomyManager;
+import com.palordersoftworks.economycraft.PriceRegistry;
 import net.minecraft.util.Formatting;
 import net.minecraft.command.CommandSource;
 import net.minecraft.component.DataComponentTypes;

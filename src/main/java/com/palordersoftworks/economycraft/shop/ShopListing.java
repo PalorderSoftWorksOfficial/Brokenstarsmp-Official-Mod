@@ -1,11 +1,11 @@
-package com.reazip.economycraft.shop;
+package com.palordersoftworks.economycraft.shop;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.registry.RegistryWrapper.WrapperLookup;
 import net.minecraft.registry.Registries;
-import com.reazip.economycraft.util.IdentifierCompat;
+import com.palordersoftworks.economycraft.util.IdentifierCompat;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 

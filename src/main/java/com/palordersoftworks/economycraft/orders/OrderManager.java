@@ -1,100 +1,64 @@
-package com.reazip.economycraft.shop;
+package com.palordersoftworks.economycraft.orders;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
-import com.reazip.economycraft.EconomyCraft;
-import com.reazip.economycraft.util.IdentityCompat;
 import net.minecraft.registry.Registries;
-import com.reazip.economycraft.util.IdentifierCompat;
+import net.minecraft.registry.RegistryOps;
+import com.palordersoftworks.economycraft.EconomyConfig;
+import com.palordersoftworks.economycraft.util.IdentifierCompat;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.Formatting;
-import net.minecraft.text.Text;
+import net.minecraft.item.Item;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-/** Manages shop listings and deliveries. */
-public class ShopManager {
+/** Manages order requests and deliveries. */
+public class OrderManager {
     private static final Gson GSON = new Gson();
     private final MinecraftServer server;
     private final Path file;
-    private final Map<Integer, ShopListing> listings = new HashMap<>();
+    private final Map<Integer, OrderRequest> requests = new HashMap<>();
     private final Map<UUID, List<ItemStack>> deliveries = new HashMap<>();
     private int nextId = 1;
     private final List<Runnable> listeners = new ArrayList<>();
 
-    public ShopManager(MinecraftServer server) {
+    public OrderManager(MinecraftServer server) {
         this.server = server;
-        Path dir = server.getRunDirectory().resolve("config").resolve("economycraft");
+        Path dir = server.getRunDirectory().resolve("config").resolve(EconomyConfig.CONFIG_FOLDER_NAME);
         Path dataDir = dir.resolve("data");
         try { Files.createDirectories(dataDir); } catch (IOException ignored) {}
-        this.file = dataDir.resolve("shop.json");
+        this.file = dataDir.resolve("orders.json");
         load();
     }
 
-    public Collection<ShopListing> getListings() {
-        return listings.values();
+    public Collection<OrderRequest> getRequests() {
+        return requests.values();
     }
 
-    public ShopListing getListing(int id) {
-        return listings.get(id);
+    public OrderRequest getRequest(int id) {
+        return requests.get(id);
     }
 
-    public void addListing(ShopListing listing) {
-        listing.id = nextId++;
-        listings.put(listing.id, listing);
+    public void addRequest(OrderRequest r) {
+        r.id = nextId++;
+        requests.put(r.id, r);
         notifyListeners();
         save();
     }
 
-    public ShopListing removeListing(int id) {
-        ShopListing l = listings.remove(id);
-        if (l != null) {
+    public OrderRequest removeRequest(int id) {
+        OrderRequest r = requests.remove(id);
+        if (r != null) {
             notifyListeners();
             save();
         }
-        return l;
-    }
-
-    public void notifySellerSale(ShopListing listing, ServerPlayerEntity buyer) {
-        if (listing == null || buyer == null) return;
-
-        UUID sellerId = listing.seller;
-        if (sellerId == null) return;
-
-        ServerPlayerEntity seller = server.getPlayerManager().getPlayer(sellerId);
-        if (seller == null) return;
-
-        ItemStack stack = listing.item;
-        int amount = (stack == null || stack.isEmpty()) ? 0 : stack.getCount();
-        String itemName = (stack == null || stack.isEmpty())
-                ? "item"
-                : stack.getName().getString();
-
-        String buyerName = IdentityCompat.of(buyer).name();
-        long price = listing.price;
-
-        Text msg = Text.literal(
-                "Sold " + amount + "x " + itemName +
-                        " to " + buyerName +
-                        " for " + EconomyCraft.formatMoney(price)
-        ).formatted(Formatting.GREEN);
-
-
-        seller.sendMessage(msg);
-    }
-
-
-    public MinecraftServer server() {
-        return server;
+        return r;
     }
 
     public void addDelivery(UUID player, ItemStack stack) {
@@ -133,9 +97,9 @@ public class ShopManager {
                 String json = Files.readString(file);
                 JsonObject root = GSON.fromJson(json, JsonObject.class);
                 nextId = root.get("nextId").getAsInt();
-                for (var el : root.getAsJsonArray("listings")) {
-                    ShopListing l = ShopListing.load(el.getAsJsonObject(), server.getRegistryManager());
-                    listings.put(l.id, l);
+                for (var el : root.getAsJsonArray("requests")) {
+                    OrderRequest r = OrderRequest.load(el.getAsJsonObject(), server.getRegistryManager());
+                    requests.put(r.id, r);
                 }
                 JsonObject dObj = root.getAsJsonObject("deliveries");
                 for (String key : dObj.keySet()) {
@@ -170,11 +134,11 @@ public class ShopManager {
     public void save() {
         JsonObject root = new JsonObject();
         root.addProperty("nextId", nextId);
-        JsonArray listArr = new JsonArray();
-        for (ShopListing l : listings.values()) {
-            listArr.add(l.save(server.getRegistryManager()));
+        JsonArray reqArr = new JsonArray();
+        for (OrderRequest r : requests.values()) {
+            reqArr.add(r.save(server.getRegistryManager()));
         }
-        root.add("listings", listArr);
+        root.add("requests", reqArr);
         JsonObject dObj = new JsonObject();
         for (Map.Entry<UUID, List<ItemStack>> e : deliveries.entrySet()) {
             JsonArray arr = new JsonArray();

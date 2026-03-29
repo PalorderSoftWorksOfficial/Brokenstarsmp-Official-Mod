@@ -43,7 +43,7 @@ public final class PriceRegistry {
     public record ResolvedPrice(IdentifierCompat.Id key, PriceEntry entry) {}
 
     public PriceRegistry(MinecraftServer server) {
-        Path dir = server.getRunDirectory().resolve("config").resolve("economycraft");
+        Path dir = server.getRunDirectory().resolve("config").resolve(EconomyConfig.CONFIG_FOLDER_NAME);
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {

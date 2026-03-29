@@ -1,4 +1,4 @@
-package com.reazip.economycraft.util;
+package com.palordersoftworks.economycraft.util;
 
 import net.minecraft.command.permission.Permission;
 import net.minecraft.command.permission.PermissionLevel;
