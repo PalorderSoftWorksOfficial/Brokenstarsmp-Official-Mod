@@ -66,20 +66,15 @@ public class DropAtFeet implements ModInitializer {
 
         // SellWand use
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (world.isClient()) return ActionResult.PASS;
-            if (!(player instanceof ServerPlayerEntity sp)) return ActionResult.PASS;
-            if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
-
-            ItemStack stack = sp.getStackInHand(hand);
+            ItemStack stack = player.getStackInHand(hand);
 
             if (!SellWand.isSellWand(stack)) {
                 return ActionResult.PASS;
             }
 
-            SellWand.use(
-                    sp,
-                    sp.getCommandSource()
-            );
+            if (!world.isClient() && player instanceof ServerPlayerEntity serverPlayer) {
+                SellWand.use(serverPlayer);
+            }
 
             return ActionResult.SUCCESS;
         });
