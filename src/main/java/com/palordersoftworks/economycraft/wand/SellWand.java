@@ -48,18 +48,14 @@ public final class SellWand {
         }
 
         if (total <= 0) {
-            player.sendMessage(Text.literal("No sellable items found.")
-                    .formatted(Formatting.RED));
+            player.sendMessage(Text.literal("No sellable items found.").formatted(Formatting.RED));
             return 0;
         }
 
         manager.addMoney(player.getUuid(), total);
 
-        player.sendMessage(
-                Text.literal("Sell Wand: Sold inventory for " +
-                                EconomyCraft.formatMoney(total) + ".")
-                        .formatted(Formatting.GOLD)
-        );
+        player.sendMessage(Text.literal("Sell Wand: Sold inventory for " +
+                EconomyCraft.formatMoney(total) + ".").formatted(Formatting.GOLD));
 
         return count;
     }
@@ -68,13 +64,13 @@ public final class SellWand {
         if (stack.isEmpty()) return 0;
         if (prices.isSellBlockedByDamage(stack)) return 0;
 
-        long container = getContainerValue(prices, stack);
-        if (container > 0) return container * stack.getCount();
+        long total = 0;
+        total += getContainerValue(prices, stack);
 
         Long unit = prices.getUnitSell(stack);
-        if (unit == null) return 0;
+        if (unit != null) total += unit * stack.getCount();
 
-        return unit * stack.getCount();
+        return total;
     }
 
     private static long getContainerValue(PriceRegistry prices, ItemStack stack) {
@@ -84,18 +80,13 @@ public final class SellWand {
         long total = 0;
 
         for (ItemStack inner : contents.streamNonEmpty().toList()) {
+            if (inner.isEmpty()) continue;
             if (prices.isSellBlockedByDamage(inner)) continue;
 
-            long innerContainer = getContainerValue(prices, inner);
-            if (innerContainer > 0) {
-                total += innerContainer;
-                continue;
-            }
+            total += getContainerValue(prices, inner);
 
             Long price = prices.getUnitSell(inner);
-            if (price != null) {
-                total += price * inner.getCount();
-            }
+            if (price != null) total += price * inner.getCount();
         }
 
         return total;
