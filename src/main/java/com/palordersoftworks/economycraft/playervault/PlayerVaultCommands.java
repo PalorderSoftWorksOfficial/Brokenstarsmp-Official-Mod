@@ -3,6 +3,8 @@ package com.palordersoftworks.economycraft.playervault;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.palordersoftworks.economycraft.EconomyConfig;
 import com.palordersoftworks.economycraft.EconomyCraft;
@@ -12,6 +14,8 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+
+import java.util.concurrent.CompletableFuture;
 
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
@@ -33,12 +37,31 @@ public final class PlayerVaultCommands {
     private static LiteralArgumentBuilder<ServerCommandSource> playervaultBranch(String name) {
         return literal(name)
                 .requires(PlayerVaultCommands::mayUse)
-                .executes(ctx -> openVault(ctx.getSource(), 1))
+                .executes(ctx -> openPicker(ctx.getSource()))
                 .then(argument("vault", IntegerArgumentType.integer(1))
+                        .suggests(PlayerVaultCommands::suggestVaultNumbers)
                         .executes(ctx -> openVault(
                                 ctx.getSource(),
                                 IntegerArgumentType.getInteger(ctx, "vault")
                         )));
+    }
+
+    private static CompletableFuture<Suggestions> suggestVaultNumbers(
+            com.mojang.brigadier.context.CommandContext<ServerCommandSource> ctx,
+            SuggestionsBuilder builder
+    ) {
+        if (!(ctx.getSource().getEntity() instanceof ServerPlayerEntity p)) {
+            return Suggestions.empty();
+        }
+        int max = resolveMaxVaults(p);
+        String prefix = builder.getRemaining().toLowerCase();
+        for (int i = 1; i <= max; i++) {
+            String s = String.valueOf(i);
+            if (prefix.isEmpty() || s.startsWith(prefix)) {
+                builder.suggest(s);
+            }
+        }
+        return builder.buildFuture();
     }
 
     /** Registers {@code /playervault} and {@code /pv} when standalone commands are enabled. */
@@ -46,8 +69,9 @@ public final class PlayerVaultCommands {
         LiteralCommandNode<ServerCommandSource> node = dispatcher.register(
                 literal("playervault")
                         .requires(PlayerVaultCommands::mayUse)
-                        .executes(ctx -> openVault(ctx.getSource(), 1))
+                        .executes(ctx -> openPicker(ctx.getSource()))
                         .then(argument("vault", IntegerArgumentType.integer(1))
+                                .suggests(PlayerVaultCommands::suggestVaultNumbers)
                                 .executes(ctx -> openVault(
                                         ctx.getSource(),
                                         IntegerArgumentType.getInteger(ctx, "vault")
@@ -64,6 +88,25 @@ public final class PlayerVaultCommands {
             return true;
         }
         return FabricPermissionsCompat.check(source, PERMISSION_NODE, false);
+    }
+
+    private static int openPicker(ServerCommandSource source) {
+        if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
+            source.sendError(Text.literal("Players only."));
+            return 0;
+        }
+        int max = resolveMaxVaults(player);
+        if (max <= 0) {
+            source.sendError(Text.literal("Player vaults are disabled for you."));
+            return 0;
+        }
+        try {
+            PlayerVaultPickerUi.open(player, EconomyCraft.getManager(source.getServer()));
+        } catch (Exception e) {
+            source.sendError(Text.literal("Could not open vaults menu."));
+            return 0;
+        }
+        return 1;
     }
 
     private static int openVault(ServerCommandSource source, int index) {

@@ -84,7 +84,7 @@ public final class ServerShopUi {
     }
 
     private static void openRoot(ServerPlayerEntity player, EconomyManager eco) {
-        Text title = Text.literal("Server Shop");
+        Text title = Text.literal("Shop");
         player.openHandledScreen(new NamedScreenHandlerFactory() {
             @Override
             public Text getDisplayName() {
@@ -152,7 +152,7 @@ public final class ServerShopUi {
     }
 
     private static String formatCategoryTitle(String category) {
-        if (category == null || category.isBlank()) return "Server Shop";
+        if (category == null || category.isBlank()) return "Shop";
         String[] parts = category.replace('.', '_').split("_");
         StringBuilder sb = new StringBuilder();
         for (String part : parts) {

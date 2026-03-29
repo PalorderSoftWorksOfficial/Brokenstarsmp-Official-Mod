@@ -54,7 +54,8 @@ public final class EconomyCommands {
         dispatcher.register(literal("bal").requires(standalone).redirect(standaloneBalance));
         dispatcher.register(buildPay().requires(s -> EconomyConfig.get().standaloneCommands));
         dispatcher.register(SellCommand.register().requires(s -> EconomyConfig.get().standaloneCommands));
-        dispatcher.register(buildShop().requires(s -> EconomyConfig.get().standaloneCommands));
+        dispatcher.register(buildAuctionHouse("auctionhouse").requires(s -> EconomyConfig.get().standaloneCommands));
+        dispatcher.register(buildAuctionHouse("ah").requires(s -> EconomyConfig.get().standaloneCommands));
         dispatcher.register(buildOrders().requires(s -> EconomyConfig.get().standaloneCommands));
         dispatcher.register(buildDaily().requires(s -> EconomyConfig.get().standaloneCommands));
 
@@ -130,7 +131,8 @@ public final class EconomyCommands {
         root.then(balanceBranch("bal"));
         root.then(buildPay());
         root.then(SellCommand.register());
-        root.then(buildShop());
+        root.then(buildAuctionHouse("auctionhouse"));
+        root.then(buildAuctionHouse("ah"));
         root.then(buildOrders());
         root.then(buildDaily());
         root.then(PlayerVaultCommands.ecoSubcommand());
@@ -973,12 +975,13 @@ public final class EconomyCommands {
     }
 
     // =====================================================================
-    // === Shop commands ===================================================
+    // === Auction house (player listings) & server shop ===================
     // =====================================================================
 
-    private static LiteralArgumentBuilder<ServerCommandSource> buildShop() {
-        return literal("shop")
-                .executes(ctx -> openShop(ctx.getSource().getPlayerOrThrow(), ctx.getSource()))
+    /** Player auction house: {@code /eco auctionhouse}, {@code /eco ah}, standalone {@code /auctionhouse} and {@code /ah}. */
+    private static LiteralArgumentBuilder<ServerCommandSource> buildAuctionHouse(String name) {
+        return literal(name)
+                .executes(ctx -> openAuctionHouse(ctx.getSource().getPlayerOrThrow(), ctx.getSource()))
                 .then(literal("list")
                         .then(argument("price", LongArgumentType.longArg(1, EconomyManager.MAX))
                                 .executes(ctx -> listItem(ctx.getSource().getPlayerOrThrow(),
@@ -986,13 +989,13 @@ public final class EconomyCommands {
                                         ctx.getSource()))));
     }
 
-    private static int openShop(ServerPlayerEntity player, ServerCommandSource source) {
+    private static int openAuctionHouse(ServerPlayerEntity player, ServerCommandSource source) {
         try {
             ShopUi.open(player, EconomyCraft.getManager(source.getServer()).getShop());
             return 1;
         } catch (Exception e) {
-            LOGGER.error("[EconomyCraft] Failed to open /shop for {}", player.getDisplayName().getString(), e);
-            source.sendError(Text.literal("Failed to open shop. Check server logs."));
+            LOGGER.error("[EconomyCraft] Failed to open auction house for {}", player.getDisplayName().getString(), e);
+            source.sendError(Text.literal("Failed to open auction house. Check server logs."));
             return 0;
         }
     }
@@ -1025,8 +1028,9 @@ public final class EconomyCommands {
         return 1;
     }
 
+    /** Server catalog: {@code /eco shop} and standalone {@code /shop}. */
     private static LiteralArgumentBuilder<ServerCommandSource> buildServerShop() {
-        return literal("servershop")
+        return literal("shop")
                 .requires(src -> EconomyConfig.get().serverShopEnabled)
                 .executes(ctx -> openServerShop(ctx.getSource().getPlayerOrThrow(), ctx.getSource(), null))
                 .then(argument("category", StringArgumentType.greedyString())
@@ -1048,9 +1052,9 @@ public final class EconomyCommands {
             ServerShopUi.open(player, manager, category);
             return 1;
         } catch (Exception e) {
-            LOGGER.error("[EconomyCraft] Failed to open /servershop for {} (category={})",
+            LOGGER.error("[EconomyCraft] Failed to open /shop (server) for {} (category={})",
                     player.getDisplayName().getString(), category, e);
-            source.sendError(Text.literal("Failed to open server shop. Check server logs."));
+            source.sendError(Text.literal("Failed to open shop. Check server logs."));
             return 0;
         }
     }

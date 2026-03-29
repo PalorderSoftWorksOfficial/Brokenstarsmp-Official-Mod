@@ -37,7 +37,7 @@ public final class ShopUi {
     private static final Formatting BALANCE_VALUE_COLOR = Formatting.DARK_PURPLE;
 
     public static void open(ServerPlayerEntity player, ShopManager shop) {
-        Text title = Text.literal("Shop");
+        Text title = Text.literal("Auction House");
 
         player.openHandledScreen(new NamedScreenHandlerFactory() {
             @Override
