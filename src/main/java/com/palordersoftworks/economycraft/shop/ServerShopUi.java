@@ -2,8 +2,10 @@ package com.palordersoftworks.economycraft.shop;
 
 import com.mojang.logging.LogUtils;
 import com.palordersoftworks.economycraft.EconomyCraft;
+import com.palordersoftworks.economycraft.EconomyConfig;
 import com.palordersoftworks.economycraft.EconomyManager;
 import com.palordersoftworks.economycraft.PriceRegistry;
+import com.palordersoftworks.economycraft.wand.SellWand;
 import com.palordersoftworks.economycraft.util.ChatCompat;
 import com.palordersoftworks.economycraft.util.IdentityCompat;
 import com.palordersoftworks.economycraft.util.ProfileComponentCompat;
@@ -56,6 +58,11 @@ public final class ServerShopUi {
     private static final Formatting BALANCE_VALUE_COLOR = Formatting.DARK_PURPLE;
 
     private ServerShopUi() {}
+
+    private static boolean isSellWandEntry(PriceRegistry.PriceEntry entry) {
+        if (entry == null || entry.id() == null) return false;
+        return "economycraft".equals(entry.id().namespace()) && "sell_wand".equals(entry.id().path());
+    }
 
     public static void open(ServerPlayerEntity player, EconomyManager eco) {
         open(player, eco, null);
@@ -470,14 +477,35 @@ public final class ServerShopUi {
 
                 int stackSize = Math.max(1, entry.stack());
                 List<Text> lore = new ArrayList<>();
-                lore.add(labeledValue("Buy", EconomyCraft.formatMoney(entry.unitBuy()), LABEL_PRIMARY_COLOR));
-
-                Long stackPrice = safeMultiply(entry.unitBuy(), stackSize);
-                if (stackSize > 1 && stackPrice != null) {
-                    lore.add(labeledValue("Stack (" + stackSize + ")", EconomyCraft.formatMoney(stackPrice), LABEL_PRIMARY_COLOR));
+                if (entry.unitBuy() > 0) {
+                    lore.add(labeledValue("Buy (Money)", EconomyCraft.formatMoney(entry.unitBuy()), LABEL_PRIMARY_COLOR));
+                }
+                if (entry.unitBuyShards() > 0) {
+                    lore.add(labeledValue("Buy (Shards)", EconomyCraft.formatShards(entry.unitBuyShards()), Formatting.LIGHT_PURPLE));
                 }
 
-                lore.add(labeledValue("Left click", "Buy 1", LABEL_SECONDARY_COLOR));
+                Long stackPrice = safeMultiply(entry.unitBuy(), stackSize);
+                Long stackShardPrice = safeMultiply(entry.unitBuyShards(), stackSize);
+                if (stackSize > 1 && stackPrice != null && entry.unitBuy() > 0) {
+                    lore.add(labeledValue("Stack Money (" + stackSize + ")", EconomyCraft.formatMoney(stackPrice), LABEL_PRIMARY_COLOR));
+                }
+                if (stackSize > 1 && stackShardPrice != null && entry.unitBuyShards() > 0) {
+                    lore.add(labeledValue("Stack Shards (" + stackSize + ")", EconomyCraft.formatShards(stackShardPrice), Formatting.LIGHT_PURPLE));
+                }
+
+                boolean hasMoney = entry.unitBuy() > 0;
+                boolean hasShards = entry.unitBuyShards() > 0;
+                if (isSellWandEntry(entry)) {
+                    lore.add(labeledValue("Buy", EconomyCraft.formatMoney(10_000L) + " + " + EconomyCraft.formatShards(100L), LABEL_SECONDARY_COLOR));
+                    lore.add(labeledValue("Click", "Buy (requires both)", LABEL_SECONDARY_COLOR));
+                } else if (hasMoney && hasShards) {
+                    lore.add(labeledValue("Left click", "Buy 1 (money)", LABEL_SECONDARY_COLOR));
+                    lore.add(labeledValue("Right click", "Buy 1 (shards)", LABEL_SECONDARY_COLOR));
+                } else if (hasMoney) {
+                    lore.add(labeledValue("Click", "Buy 1 (money)", LABEL_SECONDARY_COLOR));
+                } else if (hasShards) {
+                    lore.add(labeledValue("Click", "Buy 1 (shards)", LABEL_SECONDARY_COLOR));
+                }
                 if (stackSize > 1) {
                     lore.add(labeledValue("Shift-click", "Buy " + stackSize, LABEL_SECONDARY_COLOR));
                 }
@@ -517,7 +545,7 @@ public final class ServerShopUi {
                 if (slot < navRowStart) {
                     int index = page * itemsPerPage + slot;
                     if (index < entries.size()) {
-                        handlePurchase(entries.get(index), type);
+                        handlePurchase(entries.get(index), type, dragType);
                         return;
                     }
                 }
@@ -536,8 +564,8 @@ public final class ServerShopUi {
             super.onSlotClick(slot, dragType, type, player);
         }
 
-        private void handlePurchase(PriceRegistry.PriceEntry entry, SlotActionType clickType) {
-            if (entry.unitBuy() <= 0) {
+        private void handlePurchase(PriceRegistry.PriceEntry entry, SlotActionType clickType, int dragType) {
+            if (entry.unitBuy() <= 0 && entry.unitBuyShards() <= 0) {
                 viewer.sendMessage(Text.literal("This item cannot be purchased.")
                         .formatted(Formatting.RED));
                 return;
@@ -553,31 +581,71 @@ public final class ServerShopUi {
             int stackSize = Math.max(1, entry.stack());
             int amount = clickType == SlotActionType.QUICK_MOVE ? stackSize : 1;
 
-            Long total = safeMultiply(entry.unitBuy(), amount);
+            if (isSellWandEntry(entry)) {
+                if (!EconomyConfig.get().shardsEnabled) {
+                    viewer.sendMessage(Text.literal("Shards are disabled.").formatted(Formatting.RED));
+                    return;
+                }
+                if (amount != 1) {
+                    viewer.sendMessage(Text.literal("Sell Wand can only be purchased one at a time.").formatted(Formatting.RED));
+                    return;
+                }
+                long moneyCost = 10_000L;
+                long shardCost = 100L;
+                if (!eco.removeMoney(viewer.getUuid(), moneyCost)) {
+                    viewer.sendMessage(Text.literal("Not enough balance.").formatted(Formatting.RED));
+                    return;
+                }
+                if (!eco.removeShards(viewer.getUuid(), shardCost)) {
+                    eco.addMoney(viewer.getUuid(), moneyCost);
+                    viewer.sendMessage(Text.literal("Not enough shards.").formatted(Formatting.RED));
+                    return;
+                }
+                boolean stored = giveToPlayer(createDisplayStack(entry, viewer), 1);
+                viewer.sendMessage(Text.literal("Purchased Sell Wand for " + EconomyCraft.formatMoney(moneyCost) + " + " + EconomyCraft.formatShards(shardCost) + ".")
+                        .formatted(Formatting.GREEN));
+                if (stored) {
+                    sendStoredMessage(viewer);
+                }
+                updatePage();
+                return;
+            }
+
+            boolean useShards = dragType == 1;
+            long unitPrice = useShards ? entry.unitBuyShards() : entry.unitBuy();
+            if (unitPrice <= 0) {
+                unitPrice = useShards ? entry.unitBuy() : entry.unitBuyShards();
+                useShards = !useShards;
+            }
+
+            Long total = safeMultiply(unitPrice, amount);
             if (total == null) {
                 viewer.sendMessage(Text.literal("Price too large.")
                         .formatted(Formatting.RED));
                 return;
             }
 
-            long balance = eco.getBalance(viewer.getUuid(), true);
-            if (balance < total) {
-                viewer.sendMessage(Text.literal("Not enough balance.")
-                        .formatted(Formatting.RED));
-                return;
-            }
-
-            if (!eco.removeMoney(viewer.getUuid(), total)) {
-                viewer.sendMessage(Text.literal("Not enough balance.")
-                        .formatted(Formatting.RED));
-                return;
+            if (useShards) {
+                long shards = eco.getShards(viewer.getUuid(), true);
+                if (shards < total || !eco.removeShards(viewer.getUuid(), total)) {
+                    viewer.sendMessage(Text.literal("Not enough shards.")
+                            .formatted(Formatting.RED));
+                    return;
+                }
+            } else {
+                long balance = eco.getBalance(viewer.getUuid(), true);
+                if (balance < total || !eco.removeMoney(viewer.getUuid(), total)) {
+                    viewer.sendMessage(Text.literal("Not enough balance.")
+                            .formatted(Formatting.RED));
+                    return;
+                }
             }
 
             boolean stored = giveToPlayer(base, amount);
 
             Text success = Text.literal(
                     "Purchased " + amount + "x " + base.getName().getString() +
-                            " for " + EconomyCraft.formatMoney(total))
+                            " for " + (useShards ? EconomyCraft.formatShards(total) : EconomyCraft.formatMoney(total)))
                     .formatted(Formatting.GREEN);
             viewer.sendMessage(success);
 
@@ -687,6 +755,7 @@ public final class ServerShopUi {
         map.put(normalizeCategoryKey("Ice"), IdentifierCompat.withDefaultNamespace("ice"));
         map.put(normalizeCategoryKey("Dyed"), IdentifierCompat.withDefaultNamespace("blue_dye"));
         map.put(normalizeCategoryKey("Discs"), IdentifierCompat.withDefaultNamespace("music_disc_strad"));
+        map.put(normalizeCategoryKey("Economy"), IdentifierCompat.withDefaultNamespace("emerald"));
         return map;
     }
 
@@ -753,6 +822,7 @@ public final class ServerShopUi {
             case "ice" -> Formatting.AQUA;
             case "dyed" -> Formatting.BLUE;
             case "discs" -> Formatting.DARK_PURPLE;
+            case "economy" -> Formatting.GREEN;
             default -> Formatting.WHITE;
         };
     }
@@ -848,6 +918,9 @@ public final class ServerShopUi {
     private static ItemStack createDisplayStack(PriceRegistry.PriceEntry entry, ServerPlayerEntity viewer) {
         try {
             IdentifierCompat.Id id = entry.id();
+            if (id != null && "economycraft".equals(id.namespace()) && "sell_wand".equals(id.path())) {
+                return SellWand.createSellWandItem();
+            }
 
             Optional<?> item = IdentifierCompat.registryGetOptional(Registries.ITEM, id);
             if (item.isPresent()) {

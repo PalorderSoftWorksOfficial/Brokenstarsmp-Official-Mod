@@ -53,9 +53,11 @@ public final class PlayerVaultCommands {
         if (!(ctx.getSource().getEntity() instanceof ServerPlayerEntity p)) {
             return Suggestions.empty();
         }
+        var manager = EconomyCraft.getManager(ctx.getSource().getServer());
         int max = resolveMaxVaults(p);
+        int unlocked = manager.getPlayerVaults().getUnlockedVaultCount(p.getUuid(), max);
         String prefix = builder.getRemaining().toLowerCase();
-        for (int i = 1; i <= max; i++) {
+        for (int i = 1; i <= unlocked; i++) {
             String s = String.valueOf(i);
             if (prefix.isEmpty() || s.startsWith(prefix)) {
                 builder.suggest(s);
@@ -124,8 +126,15 @@ public final class PlayerVaultCommands {
                     .formatted(Formatting.RED));
             return 0;
         }
+        var manager = EconomyCraft.getManager(source.getServer());
+        int unlocked = manager.getPlayerVaults().getUnlockedVaultCount(player.getUuid(), max);
+        if (index > unlocked) {
+            source.sendError(Text.literal("Vault #" + index + " is locked. Open /pv and use Create Vault to unlock it "
+                    + "(current: " + unlocked + "/" + max + ").").formatted(Formatting.YELLOW));
+            return 0;
+        }
         try {
-            PlayerVaultUi.open(player, EconomyCraft.getManager(source.getServer()), index);
+            PlayerVaultUi.open(player, manager, index);
         } catch (Exception e) {
             source.sendError(Text.literal("Could not open vault."));
             return 0;

@@ -34,8 +34,8 @@ public final class PlayerVaultPickerUi {
     private PlayerVaultPickerUi() {}
 
     public static void open(ServerPlayerEntity player, EconomyManager economy) {
-        int max = PlayerVaultCommands.resolveMaxVaults(player);
-        if (max <= 0) {
+        int maxAllowed = PlayerVaultCommands.resolveMaxVaults(player);
+        if (maxAllowed <= 0) {
             player.sendMessage(Text.literal("Player vaults are disabled for you.").formatted(Formatting.RED));
             return;
         }
@@ -48,7 +48,7 @@ public final class PlayerVaultPickerUi {
 
             @Override
             public net.minecraft.screen.ScreenHandler createMenu(int syncId, PlayerInventory inv, PlayerEntity p) {
-                return new VaultPickerMenu(syncId, inv, (ServerPlayerEntity) p, economy, max);
+                return new VaultPickerMenu(syncId, inv, (ServerPlayerEntity) p, economy, maxAllowed);
             }
         });
     }
@@ -76,12 +76,14 @@ public final class PlayerVaultPickerUi {
         private final SimpleInventory container = new SimpleInventory(54);
         private int page;
         private final int navRowStart = 45;
+        private int unlockedVaults;
 
         VaultPickerMenu(int syncId, PlayerInventory inv, ServerPlayerEntity viewer, EconomyManager economy, int maxVaults) {
             super(ScreenHandlerType.GENERIC_9X6, syncId);
             this.viewer = viewer;
             this.economy = economy;
             this.maxVaults = maxVaults;
+            this.unlockedVaults = economy.getPlayerVaults().getUnlockedVaultCount(viewer.getUuid(), maxVaults);
             updatePage();
             for (int i = 0; i < 54; i++) {
                 int r = i / 9;
@@ -111,6 +113,7 @@ public final class PlayerVaultPickerUi {
 
         private void updatePage() {
             container.clear();
+            unlockedVaults = economy.getPlayerVaults().getUnlockedVaultCount(viewer.getUuid(), maxVaults);
             int start = page * 45;
             int totalPages = (int) Math.ceil(maxVaults / 45.0);
 
@@ -123,14 +126,25 @@ public final class PlayerVaultPickerUi {
                     container.setStack(i, barrier);
                     continue;
                 }
-                ItemStack chest = new ItemStack(Items.CHEST);
-                chest.set(DataComponentTypes.CUSTOM_NAME,
-                        Text.literal("Vault #" + vaultIndex).styled(s -> s.withItalic(false).withColor(LABEL).withBold(true)));
-                chest.set(DataComponentTypes.LORE, new LoreComponent(List.of(
-                        Text.literal("Click to open").styled(s -> s.withItalic(false).withColor(VALUE)),
-                        Text.literal(EconomyConfig.get().playerVaultRows + " row(s)")
-                                .styled(s -> s.withItalic(false).withColor(Formatting.DARK_AQUA)))));
-                container.setStack(i, chest);
+                if (vaultIndex <= unlockedVaults) {
+                    ItemStack chest = new ItemStack(Items.CHEST);
+                    chest.set(DataComponentTypes.CUSTOM_NAME,
+                            Text.literal("Vault #" + vaultIndex).styled(s -> s.withItalic(false).withColor(LABEL).withBold(true)));
+                    chest.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                            Text.literal("Click to open").styled(s -> s.withItalic(false).withColor(VALUE)),
+                            Text.literal(EconomyConfig.get().playerVaultRows + " row(s)")
+                                    .styled(s -> s.withItalic(false).withColor(Formatting.DARK_AQUA)))));
+                    container.setStack(i, chest);
+                } else {
+                    ItemStack locked = new ItemStack(Items.BARRIER);
+                    locked.set(DataComponentTypes.CUSTOM_NAME,
+                            Text.literal("Vault #" + vaultIndex + " (Locked)")
+                                    .styled(s -> s.withItalic(false).withColor(Formatting.RED).withBold(true)));
+                    locked.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                            Text.literal("Click Create Vault to unlock the next slot.")
+                                    .styled(s -> s.withItalic(false).withColor(VALUE)))));
+                    container.setStack(i, locked);
+                }
             }
 
             container.setStack(navRowStart, createBalanceItem(viewer));
@@ -139,6 +153,8 @@ public final class PlayerVaultPickerUi {
             info.set(DataComponentTypes.CUSTOM_NAME,
                     Text.literal("Vault slots").styled(s -> s.withItalic(false).withColor(Formatting.GREEN).withBold(true)));
             info.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                    Text.literal("Unlocked: " + unlockedVaults + " vault(s)")
+                            .styled(s -> s.withItalic(false).withColor(Formatting.YELLOW)),
                     Text.literal("Maximum: " + maxVaults + " vault(s)")
                             .styled(s -> s.withItalic(false).withColor(Formatting.WHITE)),
                     Text.literal("Extra slots are set by the server (e.g. LuckPerms meta).")
@@ -147,9 +163,11 @@ public final class PlayerVaultPickerUi {
 
             ItemStack createHint = new ItemStack(Items.EMERALD);
             createHint.set(DataComponentTypes.CUSTOM_NAME,
-                    Text.literal("Need more vaults?").styled(s -> s.withItalic(false).withColor(Formatting.AQUA).withBold(true)));
+                    Text.literal("Create Vault").styled(s -> s.withItalic(false).withColor(Formatting.AQUA).withBold(true)));
             createHint.set(DataComponentTypes.LORE, new LoreComponent(List.of(
-                    Text.literal("Ask an admin to raise your vault limit.")
+                    Text.literal(unlockedVaults >= maxVaults
+                                    ? "You already unlocked the maximum."
+                                    : "Click to unlock Vault #" + (unlockedVaults + 1))
                             .styled(s -> s.withItalic(false).withColor(VALUE)))));
             container.setStack(navRowStart + 2, createHint);
 
@@ -179,9 +197,13 @@ public final class PlayerVaultPickerUi {
             if (type == SlotActionType.PICKUP) {
                 if (slot < 45) {
                     int vaultIndex = page * 45 + slot + 1;
-                    if (vaultIndex >= 1 && vaultIndex <= maxVaults) {
+                    if (vaultIndex >= 1 && vaultIndex <= unlockedVaults) {
                         ((ServerPlayerEntity) player).closeHandledScreen();
                         PlayerVaultUi.open((ServerPlayerEntity) player, economy, vaultIndex);
+                        return;
+                    } else if (vaultIndex > unlockedVaults && vaultIndex <= maxVaults) {
+                        viewer.sendMessage(Text.literal("Vault #" + vaultIndex + " is locked. Click Create Vault first.")
+                                .formatted(Formatting.YELLOW));
                         return;
                     }
                 }
@@ -192,8 +214,15 @@ public final class PlayerVaultPickerUi {
                     return;
                 }
                 if (slot == navRowStart + 2) {
-                    viewer.sendMessage(Text.literal("Extra vault slots are granted by the server (permissions).")
-                            .formatted(Formatting.YELLOW));
+                    if (unlockedVaults >= maxVaults) {
+                        viewer.sendMessage(Text.literal("You already unlocked the maximum vaults (" + maxVaults + ").")
+                                .formatted(Formatting.RED));
+                        return;
+                    }
+                    int newCount = economy.getPlayerVaults().tryUnlockNextVault(viewer.getUuid(), maxVaults);
+                    viewer.sendMessage(Text.literal("Unlocked Vault #" + newCount + " (" + newCount + "/" + maxVaults + ").")
+                            .formatted(Formatting.GREEN));
+                    updatePage();
                     return;
                 }
                 if (slot == navRowStart + 3 && page > 0) {

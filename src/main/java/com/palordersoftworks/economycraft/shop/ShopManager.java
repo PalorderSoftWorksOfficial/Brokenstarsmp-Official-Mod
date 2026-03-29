@@ -181,7 +181,7 @@ public class ShopManager {
             JsonArray arr = new JsonArray();
             for (ItemStack s : e.getValue()) {
                 JsonObject o = new JsonObject();
-                o.addProperty("item", Registries.ITEM.getKey(s.getItem()).toString());
+                o.addProperty("item", Registries.ITEM.getId(s.getItem()).toString());
                 o.addProperty("count", s.getCount());
                 JsonElement stackEl = ItemStack.CODEC.encodeStart(server.getRegistryManager().getOps(JsonOps.INSTANCE), s).result().orElse(new JsonObject());
                 o.add("stack", stackEl);

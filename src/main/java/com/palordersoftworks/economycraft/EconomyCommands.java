@@ -27,8 +27,10 @@ import com.palordersoftworks.economycraft.orders.OrderManager;
 import com.palordersoftworks.economycraft.orders.OrderRequest;
 import com.palordersoftworks.economycraft.orders.OrdersUi;
 import com.palordersoftworks.economycraft.playervault.PlayerVaultCommands;
+import com.palordersoftworks.economycraft.wand.SellWand;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.util.Hand;
 
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
@@ -58,6 +60,8 @@ public final class EconomyCommands {
         dispatcher.register(buildAuctionHouse("ah").requires(s -> EconomyConfig.get().standaloneCommands));
         dispatcher.register(buildOrders().requires(s -> EconomyConfig.get().standaloneCommands));
         dispatcher.register(buildDaily().requires(s -> EconomyConfig.get().standaloneCommands));
+        dispatcher.register(buildWithdraw().requires(s -> EconomyConfig.get().standaloneCommands));
+        dispatcher.register(buildRedeem().requires(s -> EconomyConfig.get().standaloneCommands));
 
         dispatcher.register(
                 buildAddMoney().requires(src ->
@@ -107,6 +111,12 @@ public final class EconomyCommands {
                                 && EconomyConfig.get().standaloneAdminCommands
                 )
         );
+        dispatcher.register(
+                buildGiveSellWand().requires(src ->
+                        PermissionCompat.gamemaster().test(src)
+                                && EconomyConfig.get().standaloneAdminCommands
+                )
+        );
 
         var serverShop = buildServerShop();
         serverShop.requires(
@@ -135,6 +145,8 @@ public final class EconomyCommands {
         root.then(buildAuctionHouse("ah"));
         root.then(buildOrders());
         root.then(buildDaily());
+        root.then(buildWithdraw());
+        root.then(buildRedeem());
         root.then(PlayerVaultCommands.ecoSubcommand());
         root.then(PlayerVaultCommands.ecoPlayervaultAlias());
         root.then(buildWorth());
@@ -149,6 +161,7 @@ public final class EconomyCommands {
         root.then(removeMoney);
         root.then(removePlayer);
         root.then(toggleScoreboard);
+        root.then(buildGiveSellWand());
 
         if (EconomyConfig.get().serverShopEnabled) {
             root.then(buildServerShop());
@@ -585,6 +598,14 @@ public final class EconomyCommands {
                                         ctx.getSource()))));
     }
 
+    private static LiteralArgumentBuilder<ServerCommandSource> buildGiveSellWand() {
+        return literal("giveSellWand").requires(PermissionCompat.gamemaster())
+                .then(argument("targets", GameProfileArgumentType.gameProfile())
+                        .executes(ctx -> giveSellWand(
+                                IdentityCompat.getArgAsPlayerRefs(ctx, "targets"),
+                                ctx.getSource())));
+    }
+
     private static LiteralArgumentBuilder<ServerCommandSource> buildRemoveMoney() {
         return literal("removemoney").requires(PermissionCompat.gamemaster())
                 .then(argument("targets", GameProfileArgumentType.gameProfile())
@@ -791,6 +812,34 @@ public final class EconomyCommands {
             source.sendFeedback(() -> msg, true);
         }
         return count;
+    }
+
+    private static int giveSellWand(Collection<IdentityCompat.PlayerRef> profiles, ServerCommandSource source) {
+        if (profiles.isEmpty()) {
+            source.sendError(Text.literal("No targets matched").formatted(Formatting.RED));
+            return 0;
+        }
+        var server = source.getServer();
+        int given = 0;
+        for (var p : profiles) {
+            ServerPlayerEntity online = server.getPlayerManager().getPlayer(p.id());
+            if (online == null) {
+                continue;
+            }
+            ItemStack wand = SellWand.createSellWandItem();
+            if (!online.getInventory().insertStack(wand)) {
+                online.dropItem(wand, false);
+            }
+            online.sendMessage(Text.literal("You received a Sell Wand.").formatted(Formatting.GOLD));
+            given++;
+        }
+        if (given <= 0) {
+            source.sendError(Text.literal("No online targets to give the Sell Wand to.").formatted(Formatting.RED));
+            return 0;
+        }
+        final int totalGiven = given;
+        source.sendFeedback(() -> Text.literal("Gave Sell Wand to " + totalGiven + " player(s).").formatted(Formatting.GREEN), true);
+        return totalGiven;
     }
 
     private static int removeMoney(Collection<IdentityCompat.PlayerRef> profiles, Long amount, ServerCommandSource source) {
@@ -1132,6 +1181,28 @@ public final class EconomyCommands {
                 .executes(ctx -> daily(ctx.getSource().getPlayerOrThrow(), ctx.getSource()));
     }
 
+    private static LiteralArgumentBuilder<ServerCommandSource> buildWithdraw() {
+        return literal("withdraw")
+                .then(argument("currency", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            builder.suggest("money");
+                            if (EconomyConfig.get().shardsEnabled) builder.suggest("shards");
+                            return builder.buildFuture();
+                        })
+                        .then(argument("amount", LongArgumentType.longArg(1, EconomyManager.MAX))
+                                .executes(ctx -> withdrawNote(
+                                        ctx.getSource().getPlayerOrThrow(),
+                                        StringArgumentType.getString(ctx, "currency"),
+                                        LongArgumentType.getLong(ctx, "amount"),
+                                        ctx.getSource()
+                                ))));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> buildRedeem() {
+        return literal("redeem")
+                .executes(ctx -> redeemNote(ctx.getSource().getPlayerOrThrow(), ctx.getSource()));
+    }
+
     private static int daily(ServerPlayerEntity player, ServerCommandSource source) {
         EconomyManager manager = EconomyCraft.getManager(source.getServer());
         if (manager.claimDaily(player.getUuid())) {
@@ -1142,6 +1213,71 @@ public final class EconomyCommands {
             player.sendMessage(msg.formatted(Formatting.GREEN));
         } else {
             source.sendError(Text.literal("Already claimed today").formatted(Formatting.RED));
+        }
+        return 1;
+    }
+
+    private static int withdrawNote(ServerPlayerEntity player, String currencyRaw, long amount, ServerCommandSource source) {
+        BanknoteUtil.Currency currency = BanknoteUtil.Currency.fromInput(currencyRaw);
+        if (currency == null) {
+            source.sendError(Text.literal("Unknown currency. Use money or shards.").formatted(Formatting.RED));
+            return 0;
+        }
+        EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        if (currency == BanknoteUtil.Currency.SHARDS && !EconomyConfig.get().shardsEnabled) {
+            source.sendError(Text.literal("Shards are disabled.").formatted(Formatting.RED));
+            return 0;
+        }
+        boolean ok = currency == BanknoteUtil.Currency.MONEY
+                ? manager.removeMoney(player.getUuid(), amount)
+                : manager.removeShards(player.getUuid(), amount);
+        if (!ok) {
+            source.sendError(Text.literal("Insufficient " + currency.display().toLowerCase(Locale.ROOT) + ".")
+                    .formatted(Formatting.RED));
+            return 0;
+        }
+
+        ItemStack note = BanknoteUtil.createNote(amount, currency);
+        if (!player.getInventory().insertStack(note)) {
+            player.dropItem(note, false);
+        }
+        player.sendMessage(Text.literal("Withdrew " +
+                        (currency == BanknoteUtil.Currency.MONEY
+                                ? EconomyCraft.formatMoney(amount)
+                                : EconomyCraft.formatShards(amount))
+                        + " as a banknote.")
+                .formatted(Formatting.GREEN));
+        return 1;
+    }
+
+    private static int redeemNote(ServerPlayerEntity player, ServerCommandSource source) {
+        ItemStack hand = player.getStackInHand(Hand.MAIN_HAND);
+        BanknoteUtil.ParsedNote note = BanknoteUtil.parse(hand);
+        if (note == null) {
+            source.sendError(Text.literal("Hold a valid banknote in your main hand.").formatted(Formatting.RED));
+            return 0;
+        }
+        EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        if (note.currency() == BanknoteUtil.Currency.MONEY) {
+            manager.addMoney(player.getUuid(), note.amount());
+        } else {
+            if (!EconomyConfig.get().shardsEnabled) {
+                source.sendError(Text.literal("Shards are disabled on this server.").formatted(Formatting.RED));
+                return 0;
+            }
+            manager.addShards(player.getUuid(), note.amount());
+        }
+        boolean duplicate = manager.markBanknoteRedeemed(note.signature());
+        hand.decrement(1);
+        player.sendMessage(Text.literal("Redeemed " +
+                        (note.currency() == BanknoteUtil.Currency.MONEY
+                                ? EconomyCraft.formatMoney(note.amount())
+                                : EconomyCraft.formatShards(note.amount()))
+                        + ".")
+                .formatted(Formatting.GREEN));
+        if (duplicate) {
+            player.sendMessage(Text.literal("You have just redeemed a duped banknote please notify staff from who you got those bankntoes from")
+                    .formatted(Formatting.RED));
         }
         return 1;
     }

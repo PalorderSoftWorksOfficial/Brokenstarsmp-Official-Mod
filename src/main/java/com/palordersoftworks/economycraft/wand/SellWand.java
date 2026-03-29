@@ -1,8 +1,8 @@
 package com.palordersoftworks.economycraft.wand;
 
-import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.economycraft.EconomyManager;
 import com.palordersoftworks.economycraft.PriceRegistry;
+import com.palordersoftworks.economycraft.EconomyCraft;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.ContainerComponent;
 import net.minecraft.component.type.NbtComponent;
@@ -12,10 +12,25 @@ import net.minecraft.item.Items;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Block;
+import net.minecraft.block.ChestBlock;
 
 public final class SellWand {
 
     private SellWand() {}
+
+    public static ItemStack createSellWandItem() {
+        ItemStack stack = new ItemStack(Items.GOLDEN_HOE);
+        net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
+        nbt.putBoolean("sellWand", true);
+        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
+        return stack;
+    }
 
     public static boolean isSellWand(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
@@ -26,6 +41,71 @@ public final class SellWand {
     }
 
     public static int use(ServerPlayerEntity player) {
+        return usePlayerInventory(player);
+    }
+
+    public static int useOnTargetContainer(ServerPlayerEntity player) {
+        HitResult hit = player.raycast(5.0D, 0.0F, false);
+        if (!(hit instanceof BlockHitResult bhr) || hit.getType() != HitResult.Type.BLOCK) {
+            player.sendMessage(Text.literal("Look at a container to use the Sell Wand.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        BlockPos pos = bhr.getBlockPos();
+        Inventory inv = resolveTargetInventory(player, pos);
+        if (inv == null) {
+            player.sendMessage(Text.literal("That block is not a sellable container.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        EconomyManager manager = EconomyCraft.getManager(player.getEntityWorld().getServer());
+        PriceRegistry prices = manager.getPrices();
+        long total = 0;
+        int soldStacks = 0;
+
+        for (int i = 0; i < inv.size(); i++) {
+            ItemStack stack = inv.getStack(i);
+            if (stack.isEmpty()) continue;
+            long value = getStackValue(prices, stack);
+            if (value <= 0) continue;
+            total += value;
+            soldStacks += stack.getCount();
+            inv.setStack(i, ItemStack.EMPTY);
+        }
+        inv.markDirty();
+
+        if (total <= 0) {
+            player.sendMessage(Text.literal("No sellable items found in that container.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        manager.addMoney(player.getUuid(), total);
+        player.sendMessage(
+                Text.literal("Sell Wand: Sold container for " + EconomyCraft.formatMoney(total) + ".")
+                        .formatted(Formatting.GOLD)
+        );
+        return soldStacks;
+    }
+
+    private static Inventory resolveTargetInventory(ServerPlayerEntity player, BlockPos pos) {
+        var world = player.getEntityWorld();
+        BlockState state = world.getBlockState(pos);
+        Block block = state.getBlock();
+        if (block instanceof ChestBlock chestBlock) {
+            // For double chests this returns a combined inventory.
+            Object chestInv = ChestBlock.getInventory(chestBlock, state, world, pos, true);
+            if (chestInv instanceof Inventory inventory) {
+                return inventory;
+            }
+        }
+        var be = world.getBlockEntity(pos);
+        if (be instanceof Inventory inventory) {
+            return inventory;
+        }
+        return null;
+    }
+
+    private static int usePlayerInventory(ServerPlayerEntity player) {
         EconomyManager manager = EconomyCraft.getManager(player.getEntityWorld().getServer());
         PriceRegistry prices = manager.getPrices();
 

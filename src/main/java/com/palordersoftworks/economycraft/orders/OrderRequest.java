@@ -23,7 +23,7 @@ public class OrderRequest {
         obj.addProperty("id", id);
         if (requester != null) obj.addProperty("requester", requester.toString());
         obj.addProperty("price", price);
-        obj.addProperty("item", Registries.ITEM.getKey(item.getItem()).toString());
+        obj.addProperty("item", Registries.ITEM.getId(item.getItem()).toString());
         obj.addProperty("amount", amount);
         JsonElement stackEl = ItemStack.CODEC.encodeStart(provider.getOps(JsonOps.INSTANCE), item).result().orElse(new JsonObject());
         obj.add("stack", stackEl);

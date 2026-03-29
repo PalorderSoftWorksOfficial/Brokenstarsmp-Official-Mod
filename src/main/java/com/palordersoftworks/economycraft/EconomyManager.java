@@ -32,11 +32,13 @@ public class EconomyManager {
     private final Path shardsFile;
     private final Path dailyFile;
     private final Path dailySellFile;
+    private final Path banknoteSignaturesFile;
 
     private final Map<UUID, Long> balances = new HashMap<>();
     private final Map<UUID, Long> shards = new HashMap<>();
     private final Map<UUID, Long> lastDaily = new HashMap<>();
     private final Map<UUID, DailySellData> dailySells = new HashMap<>();
+    private final Set<String> redeemedBanknoteSignatures = new HashSet<>();
     private Map<UUID, String> diskUserCache = null;
     private final PriceRegistry prices;
 
@@ -73,11 +75,13 @@ public class EconomyManager {
         this.shardsFile = dataDir.resolve("shards.json");
         this.dailyFile = dataDir.resolve("daily.json");
         this.dailySellFile = dataDir.resolve("daily_sells.json");
+        this.banknoteSignaturesFile = dataDir.resolve("banknote_signatures.json");
 
         load();
         loadShards();
         loadDaily();
         loadDailySells();
+        loadBanknoteSignatures();
 
         this.shop = new com.palordersoftworks.economycraft.shop.ShopManager(server);
         this.orders = new com.palordersoftworks.economycraft.orders.OrderManager(server);
@@ -396,6 +400,42 @@ public class EconomyManager {
         } catch (IOException ignored) {}
 
         saveShards();
+        saveBanknoteSignatures();
+    }
+
+    private void loadBanknoteSignatures() {
+        if (!Files.exists(banknoteSignaturesFile)) return;
+        try {
+            String json = Files.readString(banknoteSignaturesFile);
+            Set<String> signatures = GSON.fromJson(json, new TypeToken<Set<String>>(){}.getType());
+            if (signatures != null) {
+                redeemedBanknoteSignatures.clear();
+                for (String s : signatures) {
+                    if (s != null && !s.isBlank()) {
+                        redeemedBanknoteSignatures.add(s);
+                    }
+                }
+            }
+        } catch (IOException ignored) {}
+    }
+
+    private void saveBanknoteSignatures() {
+        try {
+            String json = GSON.toJson(new HashSet<>(redeemedBanknoteSignatures), new TypeToken<Set<String>>(){}.getType());
+            Files.writeString(banknoteSignaturesFile, json);
+        } catch (IOException ignored) {}
+    }
+
+    /**
+     * @return true when signature was already redeemed before (duplicate).
+     */
+    public boolean markBanknoteRedeemed(String signature) {
+        if (signature == null || signature.isBlank()) return false;
+        boolean duplicate = !redeemedBanknoteSignatures.add(signature);
+        if (!duplicate) {
+            saveBanknoteSignatures();
+        }
+        return duplicate;
     }
 
     private void loadDaily() {

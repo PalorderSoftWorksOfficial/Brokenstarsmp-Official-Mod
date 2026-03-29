@@ -39,6 +39,8 @@ public final class PriceRegistry {
             .create();
     private final Path file;
     private final Map<IdentifierCompat.Id, PriceEntry> prices = new LinkedHashMap<>();
+    public static final IdentifierCompat.Id SELL_WAND_ID =
+            IdentifierCompat.fromNamespaceAndPath("economycraft", "sell_wand");
 
     public record ResolvedPrice(IdentifierCompat.Id key, PriceEntry entry) {}
 
@@ -105,10 +107,23 @@ public final class PriceRegistry {
                 int stack = getInt(obj, "stack", 1);
                 long unitBuy = getLong(obj, "unit_buy", 0L);
                 long unitSell = getLong(obj, "unit_sell", 0L);
+                long unitBuyShards = getLong(obj, "unit_buy_shards", 0L);
+                long unitSellShards = getLong(obj, "unit_sell_shards", 0L);
 
-                PriceEntry entry = new PriceEntry(id, category, stack, unitBuy, unitSell);
+                PriceEntry entry = new PriceEntry(id, category, stack, unitBuy, unitSell, unitBuyShards, unitSellShards);
                 prices.put(id, entry);
             }
+
+            // Built-in economy listing: always fixed to 10k money + 100 shards.
+            prices.put(SELL_WAND_ID, new PriceEntry(
+                    SELL_WAND_ID,
+                    "economy",
+                    1,
+                    10_000L,
+                    0L,
+                    100L,
+                    0L
+            ));
 
             if (missingItemCount > 0) {
                 LOGGER.warn("[EconomyCraft] Skipped {} price entries for items not present in this server version.", missingItemCount);
@@ -149,6 +164,16 @@ public final class PriceRegistry {
         return (p != null && p.unitSell() > 0) ? p.unitSell() : null;
     }
 
+    public Long getUnitBuyShards(ItemStack stack) {
+        PriceEntry p = get(stack);
+        return (p != null && p.unitBuyShards() > 0) ? p.unitBuyShards() : null;
+    }
+
+    public Long getUnitSellShards(ItemStack stack) {
+        PriceEntry p = get(stack);
+        return (p != null && p.unitSellShards() > 0) ? p.unitSellShards() : null;
+    }
+
     public Integer getStackSize(ItemStack stack) {
         PriceEntry p = get(stack);
         return (p != null && p.stack() > 0) ? p.stack() : null;
@@ -156,12 +181,12 @@ public final class PriceRegistry {
 
     public boolean canBuyUnit(ItemStack stack) {
         PriceEntry p = get(stack);
-        return p != null && p.unitBuy() > 0;
+        return p != null && (p.unitBuy() > 0 || p.unitBuyShards() > 0);
     }
 
     public boolean canSellUnit(ItemStack stack) {
         PriceEntry p = get(stack);
-        return p != null && p.unitSell() > 0;
+        return p != null && (p.unitSell() > 0 || p.unitSellShards() > 0);
     }
 
     public boolean isSellBlockedByDamage(ItemStack stack) {
@@ -189,7 +214,7 @@ public final class PriceRegistry {
     public Set<String> buyCategories() {
         Set<String> out = new LinkedHashSet<>();
         for (PriceEntry p : prices.values()) {
-            if (p.unitBuy() > 0) {
+            if (p.unitBuy() > 0 || p.unitBuyShards() > 0) {
                 out.add(p.category());
             }
         }
@@ -215,7 +240,7 @@ public final class PriceRegistry {
 
         List<PriceEntry> out = new ArrayList<>();
         for (PriceEntry p : prices.values()) {
-            if (p.unitBuy() <= 0) continue;
+            if (p.unitBuy() <= 0 && p.unitBuyShards() <= 0) continue;
             if (p.category() != null && p.category().trim().toLowerCase(Locale.ROOT).equals(c)) {
                 out.add(p);
             }
@@ -226,7 +251,7 @@ public final class PriceRegistry {
     public List<String> buyTopCategories() {
         LinkedHashSet<String> out = new LinkedHashSet<>();
         for (PriceEntry p : prices.values()) {
-            if (p.unitBuy() <= 0 || p.category() == null) continue;
+            if ((p.unitBuy() <= 0 && p.unitBuyShards() <= 0) || p.category() == null) continue;
             String cat = p.category();
             int dot = cat.indexOf('.');
             if (dot > 0) {
@@ -243,7 +268,7 @@ public final class PriceRegistry {
         String root = topCategory.trim().toLowerCase(Locale.ROOT);
         LinkedHashSet<String> out = new LinkedHashSet<>();
         for (PriceEntry p : prices.values()) {
-            if (p.unitBuy() <= 0 || p.category() == null) continue;
+            if ((p.unitBuy() <= 0 && p.unitBuyShards() <= 0) || p.category() == null) continue;
             String cat = p.category().trim();
             int dot = cat.indexOf('.');
             if (dot <= 0 || dot >= cat.length() - 1) continue;
@@ -343,6 +368,9 @@ public final class PriceRegistry {
     }
 
     private static boolean isVirtualPriceId(IdentifierCompat.Id id) {
+        if ("economycraft".equals(id.namespace()) && "sell_wand".equals(id.path())) {
+            return true;
+        }
         if (!"minecraft".equals(id.namespace())) return false;
 
         String p = id.path();
@@ -382,7 +410,7 @@ public final class PriceRegistry {
     private static List<IdentifierCompat.Id> resolvePriceKeys(ItemStack stack) {
         List<IdentifierCompat.Id> out = new ArrayList<>(4);
 
-        IdentifierCompat.Id itemId = IdentifierCompat.wrap(Registries.ITEM.getKey(stack.getItem()));
+        IdentifierCompat.Id itemId = IdentifierCompat.wrap(Registries.ITEM.getId(stack.getItem()));
 
         if (stack.isOf(Items.POTION) || stack.isOf(Items.SPLASH_POTION) || stack.isOf(Items.LINGERING_POTION) || stack.isOf(Items.TIPPED_ARROW)) {
             IdentifierCompat.Id potionId = readPotionId(stack);
@@ -427,7 +455,7 @@ public final class PriceRegistry {
 
         Potion potion = opt.get().getKeyOrValue().map(Registries.POTION::get, Function.identity());
         if (potion == null) return null;
-        return IdentifierCompat.wrap(Registries.POTION.getKey(potion).orElse(null));
+        return IdentifierCompat.wrap(Registries.POTION.getId(potion));
     }
 
     @SuppressWarnings("unchecked")
@@ -539,6 +567,8 @@ public final class PriceRegistry {
             String category,
             int stack,
             long unitBuy,
-            long unitSell
+            long unitSell,
+            long unitBuyShards,
+            long unitSellShards
     ) { }
 }

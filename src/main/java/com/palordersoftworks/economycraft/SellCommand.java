@@ -34,8 +34,13 @@ public final class SellCommand {
         return literal("sell")
                 .then(literal("all")
                         .then(literal("inventory").executes(SellCommand::sellInventory))
+                        .then(literal("shards").then(literal("inventory").executes(SellCommand::sellInventoryShards)))
                         .executes(SellCommand::previewSellAll)
                         .then(literal("confirm").executes(SellCommand::confirmSellAll)))
+                .then(literal("shards")
+                        .then(argument("amount", IntegerArgumentType.integer(1))
+                                .executes(ctx -> sellMainHandShards(ctx, IntegerArgumentType.getInteger(ctx, "amount"))))
+                        .executes(ctx -> sellMainHandShards(ctx, -1)))
                 .then(argument("amount", IntegerArgumentType.integer(1))
                         .executes(ctx -> sellMainHand(ctx, IntegerArgumentType.getInteger(ctx, "amount"))))
                 .executes(ctx -> sellMainHand(ctx, -1));
@@ -150,7 +155,7 @@ public final class SellCommand {
             total += getStackTotalValue(prices, offhand);
         }
 
-        IdentifierCompat.Id heldItemId = IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getKey(hand.getItem()));
+        IdentifierCompat.Id heldItemId = IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getId(hand.getItem()));
         PENDING.put(player.getUuid(), new PendingSale(key, totalCount, total,
                 System.currentTimeMillis() + CONFIRM_EXPIRY_MS, heldItemId));
 
@@ -167,6 +172,53 @@ public final class SellCommand {
         }
 
         return totalCount;
+    }
+
+    private static int sellMainHandShards(CommandContext<ServerCommandSource> ctx, int amount) {
+        ServerCommandSource source = ctx.getSource();
+        ServerPlayerEntity player = getPlayer(source);
+        if (player == null) return 0;
+        if (!EconomyConfig.get().shardsEnabled) {
+            source.sendError(Text.literal("Shards are disabled.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        ItemStack hand = player.getMainHandStack();
+        if (hand.isEmpty()) {
+            source.sendError(Text.literal("You are not holding any item.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        PriceRegistry prices = manager.getPrices();
+        if (prices.isSellBlockedByDamage(hand)) {
+            source.sendError(Text.literal("Damaged items cannot be sold.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        int available = hand.getCount();
+        int toSell = amount < 0 ? available : amount;
+        if (toSell < 1 || toSell > available) {
+            source.sendError(Text.literal("Invalid amount.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        Long unitSell = prices.getUnitSellShards(hand);
+        if (unitSell == null) {
+            source.sendError(Text.literal("This item cannot be sold for shards.").formatted(Formatting.RED));
+            return 0;
+        }
+        Long total = safeMultiply(unitSell, toSell);
+        if (total == null) {
+            source.sendError(Text.literal("Sale amount is too large.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        hand.decrement(toSell);
+        if (hand.isEmpty()) player.setStackInHand(Hand.MAIN_HAND, ItemStack.EMPTY);
+        manager.addShards(player.getUuid(), total);
+        player.sendMessage(Text.literal("Sold for " + EconomyCraft.formatShards(total) + ".").formatted(Formatting.LIGHT_PURPLE));
+        return toSell;
     }
 
     private static int confirmSellAll(CommandContext<ServerCommandSource> ctx) {
@@ -227,6 +279,39 @@ public final class SellCommand {
 
         manager.addMoney(player.getUuid(), total);
         player.sendMessage(Text.literal("Sold inventory for " + EconomyCraft.formatMoney(total) + ".").formatted(Formatting.GREEN));
+        return count;
+    }
+
+    private static int sellInventoryShards(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource source = ctx.getSource();
+        ServerPlayerEntity player = getPlayer(source);
+        if (player == null) return 0;
+        if (!EconomyConfig.get().shardsEnabled) {
+            source.sendError(Text.literal("Shards are disabled.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        PriceRegistry prices = manager.getPrices();
+
+        long total = 0;
+        int count = 0;
+        var inv = player.getInventory();
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = inv.getStack(i);
+            if (stack.isEmpty() || prices.isSellBlockedByDamage(stack)) continue;
+            Long unit = prices.getUnitSellShards(stack);
+            if (unit == null) continue;
+            total += unit * stack.getCount();
+            count += stack.getCount();
+            inv.setStack(i, ItemStack.EMPTY);
+        }
+        if (total <= 0) {
+            source.sendError(Text.literal("No shard-sellable items found.").formatted(Formatting.RED));
+            return 0;
+        }
+        manager.addShards(player.getUuid(), total);
+        player.sendMessage(Text.literal("Sold inventory for " + EconomyCraft.formatShards(total) + ".").formatted(Formatting.LIGHT_PURPLE));
         return count;
     }
 
@@ -321,14 +406,14 @@ public final class SellCommand {
             return key.equals(rp.key());
         }
 
-        IdentifierCompat.Id itemId = IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getKey(stack.getItem()));
+        IdentifierCompat.Id itemId = IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getId(stack.getItem()));
         return key.equals(itemId) && prices.getUnitSell(stack) != null;
     }
 
     private static IdentifierCompat.Id resolveSellKey(ItemStack stack, ResolvedPrice resolved) {
         if (resolved != null) return resolved.key();
         if (stack == null || stack.isEmpty()) return null;
-        return IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getKey(stack.getItem()));
+        return IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getId(stack.getItem()));
     }
 
     private static Long safeMultiply(long value, int count) {

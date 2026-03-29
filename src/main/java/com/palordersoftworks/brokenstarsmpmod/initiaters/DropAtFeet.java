@@ -73,7 +73,8 @@ public class DropAtFeet implements ModInitializer {
             }
 
             if (!world.isClient() && player instanceof ServerPlayerEntity serverPlayer) {
-                SellWand.use(serverPlayer);
+                int sold = SellWand.useOnTargetContainer(serverPlayer);
+                return sold > 0 ? ActionResult.SUCCESS : ActionResult.PASS;
             }
 
             return ActionResult.SUCCESS;

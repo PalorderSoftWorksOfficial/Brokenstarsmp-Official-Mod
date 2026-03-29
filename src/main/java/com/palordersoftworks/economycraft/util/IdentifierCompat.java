@@ -19,8 +19,8 @@ public final class IdentifierCompat {
     private static final Constructor<?> ID_CONSTRUCTOR_ONE;
     private static final Method ID_FACTORY_ONE;
     private static final Method ID_FACTORY_TWO;
-    private static final Method REGISTRY_CONTAINS_KEY;
-    private static final Method REGISTRY_GET_OPTIONAL;
+    private static final Method REGISTRY_CONTAINS_ID;
+    private static final Method REGISTRY_GET_OPTIONAL_VALUE;
     private static final Method RESOURCE_KEY_CREATE;
     private static final Method RESOURCE_KEY_IDENTIFIER;
     private static final Method HOLDER_VALUE;
@@ -33,8 +33,8 @@ public final class IdentifierCompat {
         Constructor<?> idConstructorOne = null;
         Method idFactoryOne = null;
         Method idFactoryTwo = null;
-        Method registryContainsKey = null;
-        Method registryGetOptional = null;
+        Method registryContainsId = null;
+        Method registryGetOptionalValue = null;
         Method resourceKeyCreate = null;
         Method resourceKeyIdentifier = null;
         Method holderValue = null;
@@ -70,8 +70,8 @@ public final class IdentifierCompat {
             throw new ExceptionInInitializerError("Identifier constructor not found");
         }
 
-        registryContainsKey = findRegistryMethod(Registry.class, boolean.class, idClass);
-        registryGetOptional = findRegistryMethod(Registry.class, Optional.class, idClass);
+        registryContainsId = findRegistryContainsId(idClass);
+        registryGetOptionalValue = findRegistryGetOptionalValue(idClass);
         resourceKeyCreate = findResourceKeyCreate(idClass);
         resourceKeyIdentifier = findResourceKeyIdentifier(idClass);
         holderValue = findHolderValue();
@@ -86,8 +86,8 @@ public final class IdentifierCompat {
         ID_CONSTRUCTOR_ONE = idConstructorOne;
         ID_FACTORY_ONE = idFactoryOne;
         ID_FACTORY_TWO = idFactoryTwo;
-        REGISTRY_CONTAINS_KEY = registryContainsKey;
-        REGISTRY_GET_OPTIONAL = registryGetOptional;
+        REGISTRY_CONTAINS_ID = registryContainsId;
+        REGISTRY_GET_OPTIONAL_VALUE = registryGetOptionalValue;
         RESOURCE_KEY_CREATE = resourceKeyCreate;
         RESOURCE_KEY_IDENTIFIER = resourceKeyIdentifier;
         HOLDER_VALUE = holderValue;
@@ -151,15 +151,31 @@ public final class IdentifierCompat {
         if (id == null) {
             return false;
         }
-        return (boolean) invoke(REGISTRY_CONTAINS_KEY, registry, id.handle());
+        // Fast path for modern Yarn: avoid reflection overload mistakes.
+        if (id.handle() instanceof net.minecraft.util.Identifier ident) {
+            try {
+                return registry.containsId(ident);
+            } catch (Throwable ignored) {
+                // fall back to reflection below
+            }
+        }
+        return (boolean) invoke(REGISTRY_CONTAINS_ID, registry, id.handle());
     }
 
     public static <T> Optional<T> registryGetOptional(Registry<T> registry, Id id) {
         if (id == null) {
             return Optional.empty();
         }
+        // Fast path for modern Yarn: avoid accidentally calling getKey(T) (which returns Optional<RegistryKey<T>>).
+        if (id.handle() instanceof net.minecraft.util.Identifier ident) {
+            try {
+                return registry.getOptionalValue(ident);
+            } catch (Throwable ignored) {
+                // fall back to reflection below
+            }
+        }
         @SuppressWarnings("unchecked")
-        Optional<Object> result = (Optional<Object>) invoke(REGISTRY_GET_OPTIONAL, registry, id.handle());
+        Optional<Object> result = (Optional<Object>) invoke(REGISTRY_GET_OPTIONAL_VALUE, registry, id.handle());
         if (result.isEmpty()) {
             return Optional.empty();
         }
@@ -324,6 +340,34 @@ public final class IdentifierCompat {
             return assignableMatch;
         }
         throw new ExceptionInInitializerError("Registry method not found");
+    }
+
+    private static Method findRegistryContainsId(Class<?> idClass) {
+        // Prefer the 1.21+ containsId(Identifier) method so we don't accidentally match contains(RegistryKey).
+        for (Method method : Registry.class.getMethods()) {
+            if (!method.getName().equals("containsId")) continue;
+            if (method.getParameterCount() != 1) continue;
+            if (!boolean.class.equals(method.getReturnType())) continue;
+            if (method.getParameterTypes()[0].equals(idClass)) {
+                return method;
+            }
+        }
+        // Fallback to generic search.
+        return findRegistryMethod(Registry.class, boolean.class, idClass);
+    }
+
+    private static Method findRegistryGetOptionalValue(Class<?> idClass) {
+        // Prefer the 1.21+ getOptionalValue(Identifier) method so we don't accidentally match getKey(T) -> Optional<RegistryKey<T>>.
+        for (Method method : Registry.class.getMethods()) {
+            if (!method.getName().equals("getOptionalValue")) continue;
+            if (method.getParameterCount() != 1) continue;
+            if (!Optional.class.equals(method.getReturnType())) continue;
+            if (method.getParameterTypes()[0].equals(idClass)) {
+                return method;
+            }
+        }
+        // Fallback to generic search.
+        return findRegistryMethod(Registry.class, Optional.class, idClass);
     }
 
     private static Method findNoArgMethod(Class<?> type, String... names) {
