@@ -86,7 +86,7 @@ public final class SellCommand {
             return 0;
         }
 
-        if (EconomyConfig.get().dailySellLimit > 0 && manager.tryRecordDailySell(player.getUuid(), total)) {
+        if (EconomyConfig.get().dailySellLimit > 0 && !manager.tryRecordDailySell(player.getUuid(), total)) {
             return handleDailyLimitFailure(manager, player, source);
         }
 
@@ -120,12 +120,16 @@ public final class SellCommand {
         }
 
         ResolvedPrice resolved = prices.resolve(hand);
-        if (resolved == null) {
+        Long unitSell = prices.getUnitSell(hand);
+        long containerValue = getContainerSellValue(prices, hand);
+
+        IdentifierCompat.Id key = resolveSellKey(hand, resolved);
+        if (key == null || (resolved == null && unitSell == null && containerValue <= 0)) {
             source.sendError(Text.literal("This item cannot be sold.").formatted(Formatting.RED));
             return 0;
         }
 
-        int totalCount = countMatchingSellable(player, prices, resolved.key());
+        int totalCount = countMatchingSellable(player, prices, key);
         if (totalCount <= 0) {
             source.sendError(Text.literal("This item cannot be sold.").formatted(Formatting.RED));
             return 0;
@@ -136,18 +140,18 @@ public final class SellCommand {
 
         for (int i = 0; i < 36; i++) {
             ItemStack stack = inv.getStack(i);
-            if (isMatchingSellable(prices, stack, resolved.key())) {
+            if (isMatchingSellable(prices, stack, key)) {
                 total += getStackTotalValue(prices, stack);
             }
         }
 
         ItemStack offhand = player.getOffHandStack();
-        if (isMatchingSellable(prices, offhand, resolved.key())) {
+        if (isMatchingSellable(prices, offhand, key)) {
             total += getStackTotalValue(prices, offhand);
         }
 
         IdentifierCompat.Id heldItemId = IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getKey(hand.getItem()));
-        PENDING.put(player.getUuid(), new PendingSale(resolved.key(), totalCount, total,
+        PENDING.put(player.getUuid(), new PendingSale(key, totalCount, total,
                 System.currentTimeMillis() + CONFIRM_EXPIRY_MS, heldItemId));
 
         MutableText base = Text.literal("Sell all for " + EconomyCraft.formatMoney(total) + ". ")
@@ -179,7 +183,7 @@ public final class SellCommand {
 
         EconomyManager manager = EconomyCraft.getManager(source.getServer());
 
-        if (EconomyConfig.get().dailySellLimit > 0 && manager.tryRecordDailySell(player.getUuid(), pending.total())) {
+        if (EconomyConfig.get().dailySellLimit > 0 && !manager.tryRecordDailySell(player.getUuid(), pending.total())) {
             return handleDailyLimitFailure(manager, player, source);
         }
 
@@ -246,11 +250,13 @@ public final class SellCommand {
         long total = 0;
         for (ItemStack inner : contents.streamNonEmpty().toList()) {
             if (prices.isSellBlockedByDamage(inner)) continue;
+
             long innerContainer = getContainerSellValue(prices, inner);
             if (innerContainer > 0) {
                 total += innerContainer;
                 continue;
             }
+
             Long price = prices.getUnitSell(inner);
             if (price != null) {
                 total += price * inner.getCount();
@@ -262,6 +268,7 @@ public final class SellCommand {
     private static int countMatchingSellable(ServerPlayerEntity player, PriceRegistry prices, IdentifierCompat.Id key) {
         var inv = player.getInventory();
         int total = 0;
+
         for (int i = 0; i < 36; i++) {
             ItemStack stack = inv.getStack(i);
             if (isMatchingSellable(prices, stack, key)) {
@@ -279,6 +286,7 @@ public final class SellCommand {
     private static void removeMatching(ServerPlayerEntity player, PriceRegistry prices, IdentifierCompat.Id key, int toRemove) {
         var inv = player.getInventory();
         int remaining = toRemove;
+
         for (int i = 0; i < 36; i++) {
             ItemStack stack = inv.getStack(i);
             remaining = drainStack(prices, stack, key, remaining);
@@ -307,8 +315,20 @@ public final class SellCommand {
     private static boolean isMatchingSellable(PriceRegistry prices, ItemStack stack, IdentifierCompat.Id key) {
         if (stack == null || stack.isEmpty()) return false;
         if (prices.isSellBlockedByDamage(stack)) return false;
+
         ResolvedPrice rp = prices.resolve(stack);
-        return rp != null && key.equals(rp.key());
+        if (rp != null) {
+            return key.equals(rp.key());
+        }
+
+        IdentifierCompat.Id itemId = IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getKey(stack.getItem()));
+        return key.equals(itemId) && prices.getUnitSell(stack) != null;
+    }
+
+    private static IdentifierCompat.Id resolveSellKey(ItemStack stack, ResolvedPrice resolved) {
+        if (resolved != null) return resolved.key();
+        if (stack == null || stack.isEmpty()) return null;
+        return IdentifierCompat.wrap(net.minecraft.registry.Registries.ITEM.getKey(stack.getItem()));
     }
 
     private static Long safeMultiply(long value, int count) {
