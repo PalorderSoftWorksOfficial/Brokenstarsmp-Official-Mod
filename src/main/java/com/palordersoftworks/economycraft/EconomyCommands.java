@@ -1258,6 +1258,25 @@ public final class EconomyCommands {
             return 0;
         }
         EconomyManager manager = EconomyCraft.getManager(source.getServer());
+        boolean duplicate = manager.markBanknoteRedeemed(note.signature());
+        if (duplicate) {
+            Text warn = Text.literal("Dupe banknote detected: " + player.getName().getString()
+                            + " attempted to redeem " + note.amount() + " " + note.currency().id()
+                            + " (signature " + note.signature() + ").")
+                    .formatted(Formatting.RED);
+            for (ServerPlayerEntity p : source.getServer().getPlayerManager().getPlayerList()) {
+                if (p.getCommandSource().getPermissions().hasPermission(
+                        new net.minecraft.command.permission.Permission.Level(net.minecraft.command.permission.PermissionLevel.GAMEMASTERS)
+                )) {
+                    p.sendMessage(warn);
+                }
+            }
+            player.sendMessage(Text.literal(
+                            "This banknote has already been redeemed (duped). Please notify staff who you got it from.")
+                    .formatted(Formatting.RED));
+            return 0;
+        }
+
         if (note.currency() == BanknoteUtil.Currency.MONEY) {
             manager.addMoney(player.getUuid(), note.amount());
         } else {
@@ -1267,7 +1286,7 @@ public final class EconomyCommands {
             }
             manager.addShards(player.getUuid(), note.amount());
         }
-        boolean duplicate = manager.markBanknoteRedeemed(note.signature());
+
         hand.decrement(1);
         player.sendMessage(Text.literal("Redeemed " +
                         (note.currency() == BanknoteUtil.Currency.MONEY
@@ -1275,10 +1294,6 @@ public final class EconomyCommands {
                                 : EconomyCraft.formatShards(note.amount()))
                         + ".")
                 .formatted(Formatting.GREEN));
-        if (duplicate) {
-            player.sendMessage(Text.literal("You have just redeemed a duped banknote please notify staff from who you got those bankntoes from")
-                    .formatted(Formatting.RED));
-        }
         return 1;
     }
 

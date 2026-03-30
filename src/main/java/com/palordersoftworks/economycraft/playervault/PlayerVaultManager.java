@@ -36,6 +36,8 @@ public final class PlayerVaultManager {
     private final Map<UUID, Map<Integer, SimpleInventory>> cache = new HashMap<>();
     /** uuid -> currently unlocked vault count */
     private final Map<UUID, Integer> unlockedCounts = new HashMap<>();
+    /** uuid -> vault index -> custom name */
+    private final Map<UUID, Map<Integer, String>> vaultNames = new HashMap<>();
 
     public PlayerVaultManager(MinecraftServer server) {
         this.server = server;
@@ -52,6 +54,87 @@ public final class PlayerVaultManager {
     public void removePlayer(UUID id) {
         cache.remove(id);
         unlockedCounts.remove(id);
+        vaultNames.remove(id);
+        save();
+    }
+
+    public java.util.Set<UUID> getTrackedPlayers() {
+        java.util.Set<UUID> players = new java.util.LinkedHashSet<>();
+        players.addAll(cache.keySet());
+        players.addAll(unlockedCounts.keySet());
+        players.addAll(vaultNames.keySet());
+        return java.util.Collections.unmodifiableSet(players);
+    }
+
+    public void clearVault(UUID owner, int vaultIndex) {
+        if (owner == null || vaultIndex < 1) return;
+        Map<Integer, SimpleInventory> forPlayer = cache.get(owner);
+        if (forPlayer == null) return;
+        SimpleInventory vault = forPlayer.get(vaultIndex);
+        if (vault == null) return;
+        for (int i = 0; i < vault.size(); i++) {
+            vault.setStack(i, ItemStack.EMPTY);
+        }
+        save();
+    }
+
+    public void deleteVault(UUID owner, int vaultIndex) {
+        if (owner == null || vaultIndex < 1) return;
+        Map<Integer, SimpleInventory> forPlayer = cache.get(owner);
+        if (forPlayer != null) {
+            forPlayer.remove(vaultIndex);
+            if (forPlayer.isEmpty()) {
+                cache.remove(owner);
+            }
+        }
+        Map<Integer, String> names = vaultNames.get(owner);
+        if (names != null) {
+            names.remove(vaultIndex);
+            if (names.isEmpty()) {
+                vaultNames.remove(owner);
+            }
+        }
+        int unlocked = unlockedCounts.getOrDefault(owner, 1);
+        if (vaultIndex >= unlocked) {
+            unlocked = Math.max(1, unlocked - 1);
+            unlockedCounts.put(owner, unlocked);
+        }
+        save();
+    }
+
+    public void clearAllVaults(UUID owner) {
+        if (owner == null) return;
+        Map<Integer, SimpleInventory> forPlayer = cache.get(owner);
+        if (forPlayer != null) {
+            for (SimpleInventory vault : forPlayer.values()) {
+                for (int i = 0; i < vault.size(); i++) {
+                    vault.setStack(i, ItemStack.EMPTY);
+                }
+            }
+        }
+        save();
+    }
+
+    public String getVaultName(UUID owner, int vaultIndex) {
+        if (owner == null || vaultIndex < 1) return null;
+        Map<Integer, String> map = vaultNames.get(owner);
+        if (map == null) return null;
+        String name = map.get(vaultIndex);
+        if (name == null) return null;
+        String trimmed = name.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public void setVaultName(UUID owner, int vaultIndex, String name) {
+        if (owner == null || vaultIndex < 1) return;
+        String trimmed = name == null ? "" : name.trim();
+        Map<Integer, String> map = vaultNames.computeIfAbsent(owner, u -> new HashMap<>());
+        if (trimmed.isEmpty()) {
+            map.remove(vaultIndex);
+        } else {
+            if (trimmed.length() > 32) trimmed = trimmed.substring(0, 32);
+            map.put(vaultIndex, trimmed);
+        }
         save();
     }
 
@@ -119,12 +202,26 @@ public final class PlayerVaultManager {
         java.util.Set<UUID> players = new java.util.LinkedHashSet<>();
         players.addAll(cache.keySet());
         players.addAll(unlockedCounts.keySet());
+        players.addAll(vaultNames.keySet());
         for (UUID playerId : players) {
             Map<Integer, SimpleInventory> playerVaults = cache.getOrDefault(playerId, Map.of());
             JsonObject vaults = new JsonObject();
             JsonObject meta = new JsonObject();
             int unlocked = getUnlockedVaultCount(playerId, Integer.MAX_VALUE);
             meta.addProperty("unlocked", unlocked);
+            Map<Integer, String> names = vaultNames.get(playerId);
+            if (names != null && !names.isEmpty()) {
+                JsonObject namesObj = new JsonObject();
+                for (var e : names.entrySet()) {
+                    if (e.getKey() == null || e.getKey() < 1) continue;
+                    String v = e.getValue();
+                    if (v == null) continue;
+                    String t = v.trim();
+                    if (t.isEmpty()) continue;
+                    namesObj.addProperty(String.valueOf(e.getKey()), t);
+                }
+                meta.add("names", namesObj);
+            }
             vaults.add("_meta", meta);
             for (var eVault : playerVaults.entrySet()) {
                 JsonArray slots = new JsonArray();
@@ -163,6 +260,7 @@ public final class PlayerVaultManager {
             var ops = server.getRegistryManager().getOps(JsonOps.INSTANCE);
             cache.clear();
             unlockedCounts.clear();
+            vaultNames.clear();
             for (var pe : root.entrySet()) {
                 UUID uuid;
                 try {
@@ -173,6 +271,7 @@ public final class PlayerVaultManager {
                 if (!pe.getValue().isJsonObject()) continue;
                 JsonObject vaultObj = pe.getValue().getAsJsonObject();
                 Map<Integer, SimpleInventory> map = new HashMap<>();
+                Map<Integer, String> names = new HashMap<>();
                 int unlocked = 1;
                 for (var ve : vaultObj.entrySet()) {
                     if ("_meta".equals(ve.getKey()) && ve.getValue().isJsonObject()) {
@@ -183,6 +282,27 @@ public final class PlayerVaultManager {
                                 unlocked = Math.max(1, meta.get("unlocked").getAsInt());
                             } catch (Exception ignored) {
                                 unlocked = 1;
+                            }
+                        }
+                        if (meta.has("names") && meta.get("names").isJsonObject()) {
+                            JsonObject n = meta.getAsJsonObject("names");
+                            for (var ne : n.entrySet()) {
+                                int idx;
+                                try {
+                                    idx = Integer.parseInt(ne.getKey());
+                                } catch (NumberFormatException ignored) {
+                                    continue;
+                                }
+                                if (idx < 1) continue;
+                                if (ne.getValue() != null && ne.getValue().isJsonPrimitive()
+                                        && ne.getValue().getAsJsonPrimitive().isString()) {
+                                    String val = ne.getValue().getAsString();
+                                    if (val != null && !val.trim().isEmpty()) {
+                                        String t = val.trim();
+                                        if (t.length() > 32) t = t.substring(0, 32);
+                                        names.put(idx, t);
+                                    }
+                                }
                             }
                         }
                         continue;
@@ -211,6 +331,9 @@ public final class PlayerVaultManager {
                 }
                 cache.put(uuid, map);
                 unlockedCounts.put(uuid, unlocked);
+                if (!names.isEmpty()) {
+                    vaultNames.put(uuid, names);
+                }
             }
             LOGGER.info("[EconomyCraft] Loaded player vault data for {} players.", cache.size());
         } catch (Exception e) {

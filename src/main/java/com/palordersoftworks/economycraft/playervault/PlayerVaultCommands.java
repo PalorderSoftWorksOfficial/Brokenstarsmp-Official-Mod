@@ -2,6 +2,7 @@ package com.palordersoftworks.economycraft.playervault;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
@@ -38,6 +39,15 @@ public final class PlayerVaultCommands {
         return literal(name)
                 .requires(PlayerVaultCommands::mayUse)
                 .executes(ctx -> openPicker(ctx.getSource()))
+                .then(literal("name")
+                        .then(argument("vault", IntegerArgumentType.integer(1))
+                                .suggests(PlayerVaultCommands::suggestVaultNumbers)
+                                .then(argument("name", StringArgumentType.greedyString())
+                                        .executes(ctx -> renameVault(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "vault"),
+                                                StringArgumentType.getString(ctx, "name")
+                                        )))))
                 .then(argument("vault", IntegerArgumentType.integer(1))
                         .suggests(PlayerVaultCommands::suggestVaultNumbers)
                         .executes(ctx -> openVault(
@@ -138,6 +148,29 @@ public final class PlayerVaultCommands {
         } catch (Exception e) {
             source.sendError(Text.literal("Could not open vault."));
             return 0;
+        }
+        return 1;
+    }
+
+    private static int renameVault(ServerCommandSource source, int index, String name) {
+        if (!(source.getEntity() instanceof ServerPlayerEntity player)) {
+            source.sendError(Text.literal("Players only."));
+            return 0;
+        }
+        int max = resolveMaxVaults(player);
+        var manager = EconomyCraft.getManager(source.getServer());
+        int unlocked = manager.getPlayerVaults().getUnlockedVaultCount(player.getUuid(), max);
+        if (index < 1 || index > unlocked) {
+            source.sendError(Text.literal("That vault is locked or invalid.").formatted(Formatting.RED));
+            return 0;
+        }
+        manager.getPlayerVaults().setVaultName(player.getUuid(), index, name);
+        String trimmed = name == null ? "" : name.trim();
+        if (trimmed.isEmpty()) {
+            player.sendMessage(Text.literal("Cleared name for Vault #" + index + ".").formatted(Formatting.GREEN));
+        } else {
+            if (trimmed.length() > 32) trimmed = trimmed.substring(0, 32);
+            player.sendMessage(Text.literal("Named Vault #" + index + " to \"" + trimmed + "\".").formatted(Formatting.GREEN));
         }
         return 1;
     }

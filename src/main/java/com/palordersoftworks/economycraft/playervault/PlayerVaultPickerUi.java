@@ -18,6 +18,7 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.server.PlayerConfigEntry;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -128,8 +129,10 @@ public final class PlayerVaultPickerUi {
                 }
                 if (vaultIndex <= unlockedVaults) {
                     ItemStack chest = new ItemStack(Items.CHEST);
+                    String vName = economy.getPlayerVaults().getVaultName(viewer.getUuid(), vaultIndex);
                     chest.set(DataComponentTypes.CUSTOM_NAME,
-                            Text.literal("Vault #" + vaultIndex).styled(s -> s.withItalic(false).withColor(LABEL).withBold(true)));
+                            Text.literal("Vault #" + vaultIndex + (vName != null ? " - " + vName : ""))
+                                    .styled(s -> s.withItalic(false).withColor(LABEL).withBold(true)));
                     chest.set(DataComponentTypes.LORE, new LoreComponent(List.of(
                             Text.literal("Click to open").styled(s -> s.withItalic(false).withColor(VALUE)),
                             Text.literal(EconomyConfig.get().playerVaultRows + " row(s)")
@@ -177,6 +180,23 @@ public final class PlayerVaultPickerUi {
                         Text.literal("Previous page").styled(s -> s.withItalic(false)));
                 container.setStack(navRowStart + 3, prev);
             }
+        if (viewer.getCommandSource().getPermissions().hasPermission(
+            new net.minecraft.command.permission.Permission.Level(net.minecraft.command.permission.PermissionLevel.ADMINS))) {
+                ItemStack admin = new ItemStack(Items.PLAYER_HEAD);
+                ProfileComponentCompat.tryResolvedOrUnresolved(viewer.getGameProfile())
+                        .ifPresent(resolvable -> admin.set(DataComponentTypes.PROFILE, resolvable));
+                admin.set(DataComponentTypes.CUSTOM_NAME,
+                        Text.literal("Admin panel")
+                                .styled(s -> s.withItalic(false)
+                                        .withColor(Formatting.RED)
+                                        .withBold(true)));
+                admin.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                        Text.literal("Click to manage any player's vaults")
+                                .styled(s -> s.withItalic(false)
+                                        .withColor(Formatting.DARK_RED))
+                )));
+                container.setStack(navRowStart + 6, admin);
+            }
 
             ItemStack paper = new ItemStack(Items.PAPER);
             paper.set(DataComponentTypes.CUSTOM_NAME,
@@ -198,6 +218,11 @@ public final class PlayerVaultPickerUi {
                 if (slot < 45) {
                     int vaultIndex = page * 45 + slot + 1;
                     if (vaultIndex >= 1 && vaultIndex <= unlockedVaults) {
+                        if (dragType == 1) {
+                            ((ServerPlayerEntity) player).closeHandledScreen();
+                            PlayerVaultUi.openRenameAnvil((ServerPlayerEntity) player, economy, viewer.getUuid(), vaultIndex);
+                            return;
+                        }
                         ((ServerPlayerEntity) player).closeHandledScreen();
                         PlayerVaultUi.open((ServerPlayerEntity) player, economy, vaultIndex);
                         return;
@@ -232,6 +257,31 @@ public final class PlayerVaultPickerUi {
                 }
                 if (slot == navRowStart + 5 && (page + 1) * 45 < maxVaults) {
                     page++;
+                    updatePage();
+                    return;
+                }
+    if (viewer.getCommandSource().getPermissions().hasPermission(
+        new net.minecraft.command.permission.Permission.Level(net.minecraft.command.permission.PermissionLevel.ADMINS))
+        && slot == navRowStart + 6) {
+                    ((ServerPlayerEntity) player).closeHandledScreen();
+                    PlayerVaultAdminUi.open((ServerPlayerEntity) player, economy);
+                    return;
+                }
+            }
+            if (slot < 45 && type == SlotActionType.QUICK_MOVE) {
+                int vaultIndex = page * 45 + slot + 1;
+                if (vaultIndex >= 1 && vaultIndex <= unlockedVaults) {
+                    economy.getPlayerVaults().clearVault(viewer.getUuid(), vaultIndex);
+                    viewer.sendMessage(Text.literal("Vault #" + vaultIndex + " cleared.").formatted(Formatting.GREEN));
+                    updatePage();
+                    return;
+                }
+            }
+            if (slot < 45 && type == SlotActionType.THROW) {
+                int vaultIndex = page * 45 + slot + 1;
+                if (vaultIndex >= 1 && vaultIndex <= unlockedVaults) {
+                    economy.getPlayerVaults().deleteVault(viewer.getUuid(), vaultIndex);
+                    viewer.sendMessage(Text.literal("Vault #" + vaultIndex + " deleted.").formatted(Formatting.RED));
                     updatePage();
                     return;
                 }
