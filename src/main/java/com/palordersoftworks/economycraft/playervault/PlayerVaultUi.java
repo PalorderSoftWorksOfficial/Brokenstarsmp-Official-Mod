@@ -146,14 +146,12 @@ public final class PlayerVaultUi {
             }
             // prevent duplication: ensure any input/result stacks are cleared after taking output
             try {
-                // clear input slots (both) and call updateResult to recompute output (will be empty)
                 this.input.setStack(0, ItemStack.EMPTY);
                 this.input.setStack(1, ItemStack.EMPTY);
                 this.updateResult();
             } catch (Exception ignored) {       
             }
             manager.save();
-            // close the anvil UI for the player to avoid any remaining client-side interaction
             if (player instanceof ServerPlayerEntity serverPlayer) {
                 try {
                     serverPlayer.closeHandledScreen();
@@ -166,6 +164,4 @@ public final class PlayerVaultUi {
             return true;
         }
     }
-
-    // Client-only helper removed; renaming is performed server-side via the Anvil handler above.
 }
