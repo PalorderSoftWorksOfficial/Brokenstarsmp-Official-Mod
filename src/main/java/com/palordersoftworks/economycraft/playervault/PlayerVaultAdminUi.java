@@ -2,7 +2,7 @@ package com.palordersoftworks.economycraft.playervault;
 
 import com.palordersoftworks.economycraft.EconomyConfig;
 import com.palordersoftworks.economycraft.EconomyManager;
-import com.palordersoftworks.economycraft.util.IdentityCompat;
+// IdentityCompat not needed in this class; was unused import removed
 import com.palordersoftworks.economycraft.util.ProfileComponentCompat;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.item.ItemStack;
@@ -40,22 +40,21 @@ public final class PlayerVaultAdminUi {
 
             @Override
             public ScreenHandler createMenu(int syncId, PlayerInventory inv, PlayerEntity player) {
-                return new PlayerSelectionMenu(syncId, inv, admin, economy);
+                return new PlayerSelectionMenu(syncId, inv, economy);
             }
         });
     }
 
     private static class PlayerSelectionMenu extends ScreenHandler {
-        private final ServerPlayerEntity admin;
+    // admin reference removed — not needed inside this menu
         private final EconomyManager economy;
         private final List<UUID> players;
         private final SimpleInventory container = new SimpleInventory(54);
         private int page;
         private final int navRowStart = 45;
 
-        PlayerSelectionMenu(int syncId, PlayerInventory inv, ServerPlayerEntity admin, EconomyManager economy) {
+        PlayerSelectionMenu(int syncId, PlayerInventory inv, EconomyManager economy) {
             super(ScreenHandlerType.GENERIC_9X6, syncId);
-            this.admin = admin;
             this.economy = economy;
             this.players = new ArrayList<>(economy.getPlayerVaults().getTrackedPlayers());
             this.updatePage();
@@ -381,5 +380,8 @@ public final class PlayerVaultAdminUi {
         public ItemStack quickMove(PlayerEntity player, int index) {
             return ItemStack.EMPTY;
         }
+
+        // Removed client-side rename helper (referenced undefined client classes/vars). Server-side renaming
+        // is handled via the anvil handler in PlayerVaultUi.openRenameAnvil.
     }
 }

@@ -4,7 +4,6 @@ import com.palordersoftworks.economycraft.EconomyConfig;
 import com.palordersoftworks.economycraft.EconomyManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventory;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.screen.GenericContainerScreenHandler;
 import net.minecraft.screen.NamedScreenHandlerFactory;
@@ -153,4 +152,6 @@ public final class PlayerVaultUi {
             return true;
         }
     }
+
+    // Client-only helper removed; renaming is performed server-side via the Anvil handler above.
 }

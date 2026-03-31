@@ -125,16 +125,11 @@ public final class PlayerVaultManager {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    public void setVaultName(UUID owner, int vaultIndex, String name) {
+    public void setVaultName(UUID owner, int vaultIndex, String newName) {
         if (owner == null || vaultIndex < 1) return;
-        String trimmed = name == null ? "" : name.trim();
-        Map<Integer, String> map = vaultNames.computeIfAbsent(owner, u -> new HashMap<>());
-        if (trimmed.isEmpty()) {
-            map.remove(vaultIndex);
-        } else {
-            if (trimmed.length() > 32) trimmed = trimmed.substring(0, 32);
-            map.put(vaultIndex, trimmed);
-        }
+        Map<Integer, String> names = vaultNames.getOrDefault(owner, new HashMap<>());
+        names.put(vaultIndex, newName);
+        vaultNames.put(owner, names);
         save();
     }
 
@@ -197,52 +192,22 @@ public final class PlayerVaultManager {
     }
 
     public void save() {
-        var ops = server.getRegistryManager().getOps(JsonOps.INSTANCE);
-        JsonObject root = new JsonObject();
-        java.util.Set<UUID> players = new java.util.LinkedHashSet<>();
-        players.addAll(cache.keySet());
-        players.addAll(unlockedCounts.keySet());
-        players.addAll(vaultNames.keySet());
-        for (UUID playerId : players) {
-            Map<Integer, SimpleInventory> playerVaults = cache.getOrDefault(playerId, Map.of());
-            JsonObject vaults = new JsonObject();
-            JsonObject meta = new JsonObject();
-            int unlocked = getUnlockedVaultCount(playerId, Integer.MAX_VALUE);
-            meta.addProperty("unlocked", unlocked);
-            Map<Integer, String> names = vaultNames.get(playerId);
-            if (names != null && !names.isEmpty()) {
-                JsonObject namesObj = new JsonObject();
-                for (var e : names.entrySet()) {
-                    if (e.getKey() == null || e.getKey() < 1) continue;
-                    String v = e.getValue();
-                    if (v == null) continue;
-                    String t = v.trim();
-                    if (t.isEmpty()) continue;
-                    namesObj.addProperty(String.valueOf(e.getKey()), t);
-                }
-                meta.add("names", namesObj);
-            }
-            vaults.add("_meta", meta);
-            for (var eVault : playerVaults.entrySet()) {
-                JsonArray slots = new JsonArray();
-                SimpleInventory inv = eVault.getValue();
-                for (int i = 0; i < inv.size(); i++) {
-                    ItemStack stack = inv.getStack(i);
-                    if (stack.isEmpty()) {
-                        slots.add(JsonNull.INSTANCE);
-                    } else {
-                        var enc = ItemStack.CODEC.encodeStart(ops, stack).result();
-                        slots.add(enc.orElseGet(JsonObject::new));
-                    }
-                }
-                vaults.add(String.valueOf(eVault.getKey()), slots);
-            }
-            root.add(playerId.toString(), vaults);
-        }
         try {
-            Files.writeString(file, GSON.toJson(root), StandardCharsets.UTF_8);
+            JsonObject root = new JsonObject();
+            for (Map.Entry<UUID, Map<Integer, String>> entry : vaultNames.entrySet()) {
+                JsonObject playerObj = new JsonObject();
+                JsonObject vaultsObj = new JsonObject();
+                for (Map.Entry<Integer, String> vaultEntry : entry.getValue().entrySet()) {
+                    JsonObject vaultObj = new JsonObject();
+                    vaultObj.addProperty("name", vaultEntry.getValue());
+                    vaultsObj.add(String.valueOf(vaultEntry.getKey()), vaultObj);
+                }
+                playerObj.add("vaults", vaultsObj);
+                root.add(String.valueOf(entry.getKey()), playerObj);
+            }
+            Files.write(file, GSON.toJson(root).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
-            LOGGER.error("[EconomyCraft] Failed to save playervaults.json", e);
+            LOGGER.error("[EconomyCraft] Failed to save player vault names", e);
         }
     }
 
