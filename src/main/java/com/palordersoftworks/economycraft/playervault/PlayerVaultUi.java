@@ -146,14 +146,19 @@ public final class PlayerVaultUi {
             }
             // prevent duplication: ensure any input/result stacks are cleared after taking output
             try {
-                // clear input slots (both) and the result slot to avoid players keeping items
+                // clear input slots (both) and call updateResult to recompute output (will be empty)
                 this.input.setStack(0, ItemStack.EMPTY);
                 this.input.setStack(1, ItemStack.EMPTY);
-                // call updateResult to recompute output (will be empty after inputs cleared)
                 this.updateResult();
-            } catch (Exception ignored) {
+            } catch (Exception ignored) {       
             }
             manager.save();
+            // close the anvil UI for the player to avoid any remaining client-side interaction
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                try {
+                    serverPlayer.closeHandledScreen();
+                } catch (Exception ignored) { }
+            }
         }
 
         @Override
