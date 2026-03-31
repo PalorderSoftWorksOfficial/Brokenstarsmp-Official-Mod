@@ -144,6 +144,15 @@ public final class PlayerVaultUi {
                     serverPlayer.sendMessage(Text.literal("Named Vault #" + vaultIndex + " to \"" + newName + "\".").formatted(Formatting.GREEN), false);
                 }
             }
+            // prevent duplication: ensure any input/result stacks are cleared after taking output
+            try {
+                // clear input slots (both) and the result slot to avoid players keeping items
+                this.input.setStack(0, ItemStack.EMPTY);
+                this.input.setStack(1, ItemStack.EMPTY);
+                // call updateResult to recompute output (will be empty after inputs cleared)
+                this.updateResult();
+            } catch (Exception ignored) {
+            }
             manager.save();
         }
 
