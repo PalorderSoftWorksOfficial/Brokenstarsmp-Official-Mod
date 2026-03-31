@@ -173,6 +173,14 @@ public final class PlayerVaultPickerUi {
                             .styled(s -> s.withItalic(false).withColor(VALUE)))));
             container.setStack(navRowStart + 2, createHint);
 
+        ItemStack renameHint = new ItemStack(Items.NAME_TAG);
+        renameHint.set(DataComponentTypes.CUSTOM_NAME,
+            Text.literal("Rename Vault").styled(s -> s.withItalic(false).withColor(Formatting.AQUA).withBold(true)));
+        renameHint.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+            Text.literal("Click to choose a vault to rename").styled(s -> s.withItalic(false).withColor(VALUE))
+        )));
+        container.setStack(navRowStart + 7, renameHint);
+
             if (page > 0) {
                 ItemStack prev = new ItemStack(Items.ARROW);
                 prev.set(DataComponentTypes.CUSTOM_NAME,
@@ -249,6 +257,11 @@ public final class PlayerVaultPickerUi {
                     updatePage();
                     return;
                 }
+                if (slot == navRowStart + 7) {
+                    ((ServerPlayerEntity) player).closeHandledScreen();
+                    openRenamePicker((ServerPlayerEntity) player, economy, maxVaults);
+                    return;
+                }
                 if (slot == navRowStart + 3 && page > 0) {
                     page--;
                     updatePage();
@@ -297,5 +310,102 @@ public final class PlayerVaultPickerUi {
         public ItemStack quickMove(PlayerEntity player, int index) {
             return ItemStack.EMPTY;
         }
+
+    }
+
+    /** Opens a small menu listing vault indexes so the player can pick one to rename. */
+    static void openRenamePicker(ServerPlayerEntity player, EconomyManager economy, int maxVaults) {
+        player.openHandledScreen(new NamedScreenHandlerFactory() {
+            @Override
+            public Text getDisplayName() {
+                return Text.literal("Choose vault to rename");
+            }
+
+            @Override
+            public ScreenHandler createMenu(int syncId, PlayerInventory inv, PlayerEntity p) {
+                return new RenamePickerMenu(syncId, inv, (ServerPlayerEntity) p, economy, maxVaults);
+            }
+        });
+    }
+
+    private static final class RenamePickerMenu extends ScreenHandler {
+        private final ServerPlayerEntity viewer;
+        private final EconomyManager economy;
+        private final int maxVaults;
+        private final SimpleInventory container = new SimpleInventory(54);
+        private final int navRowStart = 45;
+
+        RenamePickerMenu(int syncId, PlayerInventory inv, ServerPlayerEntity viewer, EconomyManager economy, int maxVaults) {
+            super(ScreenHandlerType.GENERIC_9X6, syncId);
+            this.viewer = viewer;
+            this.economy = economy;
+            this.maxVaults = maxVaults;
+            updatePage();
+
+            for (int i = 0; i < 54; i++) {
+                int r = i / 9;
+                int c = i % 9;
+                this.addSlot(new Slot(container, i, 8 + c * 18, 18 + r * 18) {
+                    @Override public boolean canTakeItems(PlayerEntity player) { return false; }
+                    @Override public boolean canInsert(ItemStack stack) { return false; }
+                });
+            }
+
+            int y = 18 + 6 * 18 + 14;
+            for (int r = 0; r < 3; r++) {
+                for (int c = 0; c < 9; c++) {
+                    this.addSlot(new Slot(inv, c + r * 9 + 9, 8 + c * 18, y + r * 18));
+                }
+            }
+            for (int c = 0; c < 9; c++) {
+                this.addSlot(new Slot(inv, c, 8 + c * 18, y + 58));
+            }
+        }
+
+        private void updatePage() {
+            container.clear();
+            for (int i = 0; i < 45; i++) {
+                int vaultIndex = i + 1;
+                if (vaultIndex > maxVaults) {
+                    ItemStack barrier = new ItemStack(Items.GRAY_STAINED_GLASS_PANE);
+                    barrier.set(DataComponentTypes.CUSTOM_NAME, Text.literal(" ").styled(s -> s.withItalic(false)));
+                    container.setStack(i, barrier);
+                    continue;
+                }
+                int unlocked = economy.getPlayerVaults().getUnlockedVaultCount(viewer.getUuid(), maxVaults);
+                if (vaultIndex <= unlocked) {
+                    ItemStack paper = new ItemStack(Items.PAPER);
+                    paper.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Vault #" + vaultIndex).styled(s -> s.withItalic(false).withColor(Formatting.GOLD)));
+                    paper.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                            Text.literal("Click to rename this vault").styled(s -> s.withItalic(false).withColor(VALUE))
+                    )));
+                    container.setStack(i, paper);
+                } else {
+                    ItemStack locked = new ItemStack(Items.BARRIER);
+                    locked.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Vault #" + vaultIndex + " (Locked)").styled(s -> s.withItalic(false).withColor(Formatting.RED)));
+                    container.setStack(i, locked);
+                }
+            }
+        }
+
+        @Override
+        public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
+            if (type == SlotActionType.PICKUP && slot < 45) {
+                int vaultIndex = slot + 1;
+                int unlocked = economy.getPlayerVaults().getUnlockedVaultCount(viewer.getUuid(), maxVaults);
+                if (vaultIndex >= 1 && vaultIndex <= unlocked) {
+                    ((ServerPlayerEntity) player).closeHandledScreen();
+                    PlayerVaultUi.openRenameAnvil((ServerPlayerEntity) player, economy, viewer.getUuid(), vaultIndex);
+                    return;
+                } else {
+                    viewer.sendMessage(Text.literal("Vault #" + vaultIndex + " is locked.").formatted(Formatting.YELLOW));
+                    return;
+                }
+            }
+            super.onSlotClick(slot, dragType, type, player);
+        }
+
+        @Override public boolean canUse(PlayerEntity player) { return true; }
+        @Override public ItemStack quickMove(PlayerEntity player, int index) { return ItemStack.EMPTY; }
     }
 }
