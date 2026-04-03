@@ -51,7 +51,7 @@ public class EconomyManager {
     /** Target player (who must /eco coinflip accept) -> pending offer. */
     private final Map<UUID, CoinflipOffer> coinflipPending = new ConcurrentHashMap<>();
 
-    public static final long MAX = 999_999_999L;
+    public static final long MAX = Long.MAX_VALUE;
 
     public record CoinflipOffer(UUID challengerId, long amount, long expiryEpochMs) {}
 
