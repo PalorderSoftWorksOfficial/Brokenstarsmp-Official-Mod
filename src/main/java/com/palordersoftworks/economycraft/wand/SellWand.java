@@ -11,7 +11,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
@@ -19,7 +18,7 @@ import net.minecraft.inventory.Inventory;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Block;
 import net.minecraft.block.ChestBlock;
-
+import net.minecraft.util.Formatting;
 public final class SellWand {
 
     private SellWand() {}
@@ -28,7 +27,14 @@ public final class SellWand {
         ItemStack stack = new ItemStack(Items.GOLDEN_HOE);
         net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
         nbt.putBoolean("sellWand", true);
+
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
+        stack.set(DataComponentTypes.CUSTOM_NAME,
+                Text.literal("")
+                        .append(Text.literal("Sell ").formatted(Formatting.GRAY))
+                        .append(Text.literal("Wand").formatted(Formatting.GOLD))
+        );
+
         return stack;
     }
 

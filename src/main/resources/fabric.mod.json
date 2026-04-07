@@ -18,8 +18,7 @@
     ]
   },
   "mixins": [
-    "brokenstarsmp.mixins.json",
-    "brokenstarsmp.mixins.client.json"
+    "brokenstarsmp.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.11",
