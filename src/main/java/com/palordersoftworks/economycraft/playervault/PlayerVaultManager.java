@@ -193,21 +193,53 @@ public final class PlayerVaultManager {
 
     public void save() {
         try {
+            var ops = server.getRegistryManager().getOps(JsonOps.INSTANCE);
             JsonObject root = new JsonObject();
-            for (Map.Entry<UUID, Map<Integer, String>> entry : vaultNames.entrySet()) {
+            for (UUID playerId : getTrackedPlayers()) {
                 JsonObject playerObj = new JsonObject();
-                JsonObject vaultsObj = new JsonObject();
-                for (Map.Entry<Integer, String> vaultEntry : entry.getValue().entrySet()) {
-                    JsonObject vaultObj = new JsonObject();
-                    vaultObj.addProperty("name", vaultEntry.getValue());
-                    vaultsObj.add(String.valueOf(vaultEntry.getKey()), vaultObj);
+
+                JsonObject meta = new JsonObject();
+                int unlocked = unlockedCounts.getOrDefault(playerId, 1);
+                meta.addProperty("unlocked", unlocked);
+
+                Map<Integer, String> names = vaultNames.get(playerId);
+                if (names != null && !names.isEmpty()) {
+                    JsonObject namesObj = new JsonObject();
+                    for (Map.Entry<Integer, String> ne : names.entrySet()) {
+                        if (ne.getValue() == null) continue;
+                        namesObj.addProperty(String.valueOf(ne.getKey()), ne.getValue());
+                    }
+                    meta.add("names", namesObj);
                 }
-                playerObj.add("vaults", vaultsObj);
-                root.add(String.valueOf(entry.getKey()), playerObj);
+                playerObj.add("_meta", meta);
+
+                // vault inventories
+                Map<Integer, SimpleInventory> forPlayer = cache.get(playerId);
+                if (forPlayer != null && !forPlayer.isEmpty()) {
+                    for (Map.Entry<Integer, SimpleInventory> ve : forPlayer.entrySet()) {
+                        int idx = ve.getKey();
+                        SimpleInventory inv = ve.getValue();
+                        JsonArray arr = new JsonArray();
+                        for (int i = 0; i < inv.size(); i++) {
+                            ItemStack stack = inv.getStack(i);
+                            try {
+                                JsonElement encoded = ItemStack.CODEC.encodeStart(ops, stack).result().orElse(JsonNull.INSTANCE);
+                                arr.add(encoded);
+                            } catch (Exception e) {
+                                // fallback: empty
+                                arr.add(JsonNull.INSTANCE);
+                            }
+                        }
+                        playerObj.add(String.valueOf(idx), arr);
+                    }
+                }
+
+                root.add(String.valueOf(playerId), playerObj);
             }
+
             Files.write(file, GSON.toJson(root).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
-            LOGGER.error("[EconomyCraft] Failed to save player vault names", e);
+            LOGGER.error("[EconomyCraft] Failed to save player vault data", e);
         }
     }
 
