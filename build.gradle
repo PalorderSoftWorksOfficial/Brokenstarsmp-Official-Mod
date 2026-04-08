@@ -7,11 +7,22 @@ buildscript {
         classpath "org.apache.jackrabbit:jackrabbit-webdav:2.22.2"
     }
 }
+
 plugins {
     id 'fabric-loom' version "${loom_version}"
     id 'maven-publish'
     id 'org.jetbrains.kotlin.jvm' version '2.3.10'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
+
+import org.apache.jackrabbit.webdav.client.methods.HttpMkcol
+import org.apache.http.impl.client.CloseableHttpClient
+import org.apache.http.impl.client.HttpClients
+import org.apache.http.auth.UsernamePasswordCredentials
+import org.apache.http.impl.client.BasicCredentialsProvider
+import org.apache.http.client.CredentialsProvider
+import org.apache.http.auth.AuthScope
+import org.apache.http.HttpStatus
 
 sourceCompatibility = JavaVersion.VERSION_21
 targetCompatibility = JavaVersion.VERSION_21
@@ -20,12 +31,16 @@ archivesBaseName = project.archives_base_name
 version = project.mod_version
 group = project.maven_group
 
+configurations {
+    shade
+}
+
 dependencies {
-    // to change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.3")
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.3"
     compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.3"
@@ -34,14 +49,21 @@ dependencies {
     compileOnly "cc.tweaked:cc-tweaked-1.21.11-common-api:1.117.1"
     implementation "cc.tweaked:cc-tweaked-1.21.11-fabric:1.117.1"
     implementation "cc.tweaked:cc-tweaked-1.21.11-fabric-api:1.117.1"
+
     modImplementation "net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0"
+
+    implementation 'party.iroiro.luajava:luajit:4.1.0'
+    implementation 'party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop'
 }
+
 repositories {
     maven {
         name = 'PalorderHosting'
         url = 'https://maven.palorderhosting.net/'
     }
+    maven { url 'https://jitpack.io' }
 }
+
 processResources {
     inputs.property "version", project.version
 
@@ -49,42 +71,15 @@ processResources {
         expand "version": project.version
     }
 }
+
 loom {
     accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
 }
-// ensure that the encoding is set to UTF-8, no matter what the system default is
-// this fixes some edge cases with special characters not displaying correctly
-// see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
+
 tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
 }
 
-jar {
-    from "LICENSE"
-}
-
-import org.apache.jackrabbit.webdav.client.methods.HttpMkcol
-import org.apache.http.impl.client.CloseableHttpClient
-import org.apache.http.impl.client.HttpClients
-import org.apache.http.auth.UsernamePasswordCredentials
-import org.apache.http.impl.client.BasicCredentialsProvider
-import org.apache.http.client.CredentialsProvider
-import org.apache.http.auth.AuthScope
-import org.apache.http.HttpStatus
-
-// ------------------------------
-// Task: Create the version folder on the Maven repository
-// ------------------------------
-import org.apache.jackrabbit.webdav.client.methods.HttpMkcol
-import org.apache.http.impl.client.CloseableHttpClient
-import org.apache.http.impl.client.HttpClients
-import org.apache.http.auth.UsernamePasswordCredentials
-import org.apache.http.impl.client.BasicCredentialsProvider
-import org.apache.http.client.CredentialsProvider
-import org.apache.http.auth.AuthScope
-import org.apache.http.HttpStatus
-
-// Task: Create the version folder dynamically for the current mod group/artifact/version
 def createVersionFolderTask = tasks.register('createVersionFolder') {
     doLast {
         def version = project.version
@@ -106,7 +101,6 @@ def createVersionFolderTask = tasks.register('createVersionFolder') {
                 .build()
 
         try {
-            // Rename the closure parameter to avoid conflict
             def ensurePath = { httpClient, base, path ->
                 def parts = path.split("/")
                 def current = base
@@ -127,14 +121,14 @@ def createVersionFolderTask = tasks.register('createVersionFolder') {
             ensurePath(client, baseUrl, fullPath)
 
             println "Version folder created (or already exists): ${baseUrl}${fullPath}"
-
         } finally {
             client.close()
         }
     }
 }
+
 def bumpVersionLogic = { type ->
-    if (!["major","minor","patch"].contains(type)) {
+    if (!["major", "minor", "patch"].contains(type)) {
         throw new GradleException("Unknown version type: $type")
     }
 
@@ -151,10 +145,19 @@ def bumpVersionLogic = { type ->
     def patch = matcher[0][3].toInteger()
     def suffix = matcher[0][4] ?: ""
 
-    switch(type) {
-        case "major": major += 1; minor = 0; patch = 0; break
-        case "minor": minor += 1; patch = 0; break
-        case "patch": patch += 1; break
+    switch (type) {
+        case "major":
+            major += 1
+            minor = 0
+            patch = 0
+            break
+        case "minor":
+            minor += 1
+            patch = 0
+            break
+        case "patch":
+            patch += 1
+            break
     }
 
     def newVersion = "${major}.${minor}.${patch}${suffix}"
@@ -180,10 +183,27 @@ tasks.register("bumpVersion") {
         doLast { bumpVersionLogic(t) }
     }
 }
-
+tasks.named("build") {
+    dependsOn("sourcesJar", "javadocJar")
+}
 tasks.named("publish") {
     dependsOn createVersionFolderTask
+    dependsOn("sourcesJar", "javadocJar")
 }
+tasks.register('sourcesJar', Jar) {
+    archiveClassifier.set("sources")
+    from sourceSets.main.allSource
+}
+
+tasks.register('javadocJar', Jar) {
+    archiveClassifier.set("javadoc")
+    from tasks.named("javadoc")
+}
+tasks.withType(Javadoc).configureEach {
+    options.encoding = "UTF-8"
+    options.addStringOption("Xdoclint:none", "-quiet")
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -191,9 +211,11 @@ publishing {
             artifactId = project.archivesBaseName
             version = project.version
 
-            artifact(remapJar) {
-                builtBy remapJar
+            artifact(tasks.named("remapJar")) {
+                builtBy tasks.named("remapJar")
             }
+            artifact(tasks.named("sourcesJar"))
+            artifact(tasks.named("javadocJar"))
         }
     }
 

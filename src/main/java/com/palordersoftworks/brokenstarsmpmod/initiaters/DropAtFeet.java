@@ -1,19 +1,23 @@
 package com.palordersoftworks.brokenstarsmpmod.initiaters;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
 import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.economycraft.wand.SellWand;
+import com.palordersoftworks.luaj.accesswidener.LuaScriptManager;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
@@ -27,7 +31,7 @@ public class DropAtFeet implements ModInitializer {
     public void onInitialize() {
         ConfigManager.registerAnnotatedConfigs(ServerRules.class);
         ConfigManager.registerCommands();
-
+        final LuaScriptManager LUA = new LuaScriptManager();
         // Drop‑at‑feet logic
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
             if (!(entity instanceof ItemEntity item)) return;
@@ -79,5 +83,41 @@ public class DropAtFeet implements ModInitializer {
 
             return ActionResult.SUCCESS;
         });
+        CommandRegistrationCallback.EVENT.register(
+                (dispatcher, registryAccess, environment) -> {
+                    dispatcher.register(CommandManager.literal("lua")
+                            .requires(CommandManager.requirePermissionLevel(CommandManager.GAMEMASTERS_CHECK))
+                            .then(CommandManager.literal("reload").executes(ctx -> {
+                                LUA.reloadAll();
+                                return 1;
+                            }))
+                            .then(CommandManager.literal("load")
+                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                                        String script = StringArgumentType.getString(ctx, "script");
+                                        return LUA.load(script) ? 1 : 0;
+                                    })))
+                            .then(CommandManager.literal("unload")
+                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                                        String script = StringArgumentType.getString(ctx, "script");
+                                        return LUA.stop(script) ? 1 : 0;
+                                    })))
+                            .then(CommandManager.literal("run")
+                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                                        String script = StringArgumentType.getString(ctx, "script");
+                                        return LUA.run(script) ? 1 : 0;
+                                    })))
+                            .then(CommandManager.literal("stop")
+                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                                        String script = StringArgumentType.getString(ctx, "script");
+                                        return LUA.stop(script) ? 1 : 0;
+                                    })))
+                            .then(CommandManager.literal("runCode")
+                                    .then(CommandManager.argument("code", StringArgumentType.greedyString()).executes(ctx -> {
+                                        String code = StringArgumentType.getString(ctx, "code");
+                                        return LUA.runCode(code) ? 1 : 0;
+                                    })))
+                    );
+                }
+        );
     }
 }
