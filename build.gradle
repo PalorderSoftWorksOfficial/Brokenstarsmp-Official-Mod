@@ -12,6 +12,7 @@ plugins {
     id 'fabric-loom' version "${loom_version}"
     id 'maven-publish'
     id 'org.jetbrains.kotlin.jvm' version '2.3.10'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 import org.apache.jackrabbit.webdav.client.methods.HttpMkcol
@@ -30,6 +31,21 @@ archivesBaseName = project.archives_base_name
 version = project.mod_version
 group = project.maven_group
 
+repositories {
+    mavenCentral()
+
+    maven {
+        name = 'PalorderHosting'
+        url = 'https://maven.palorderhosting.net/'
+    }
+
+    maven { url 'https://jitpack.io' }
+}
+
+configurations {
+    luaShadow
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}"
@@ -47,20 +63,17 @@ dependencies {
 
     modImplementation "net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0"
 
+    // Dev runtime visibility
     modLocalRuntime "party.iroiro.luajava:luajit:4.1.0"
     modLocalRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
-    include(implementation("party.iroiro.luajava:luajit:4.1.0"))
-    include(implementation("party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"))
-    runtimeOnly 'party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop'
-}
+    // Compile-time access
+    compileOnly "party.iroiro.luajava:luajit:4.1.0"
+    compileOnly "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
-repositories {
-    maven {
-        name = 'PalorderHosting'
-        url = 'https://maven.palorderhosting.net/'
-    }
-    maven { url 'https://jitpack.io' }
+    // Pack into the final mod jar
+    luaShadow "party.iroiro.luajava:luajit:4.1.0"
+    luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 }
 
 processResources {
@@ -77,6 +90,16 @@ loom {
 
 tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
+}
+
+tasks.named("shadowJar") {
+    archiveClassifier.set("shadow")
+    configurations = [project.configurations.luaShadow]
+}
+
+tasks.named("remapJar") {
+    dependsOn tasks.named("shadowJar")
+    inputFile.set(tasks.named("shadowJar").flatMap { it.archiveFile })
 }
 
 def createVersionFolderTask = tasks.register('createVersionFolder') {
@@ -182,13 +205,16 @@ tasks.register("bumpVersion") {
         doLast { bumpVersionLogic(t) }
     }
 }
+
 tasks.named("build") {
     dependsOn("sourcesJar", "javadocJar")
 }
+
 tasks.named("publish") {
     dependsOn createVersionFolderTask
     dependsOn("sourcesJar", "javadocJar")
 }
+
 tasks.register('sourcesJar', Jar) {
     archiveClassifier.set("sources")
     from sourceSets.main.allSource
@@ -198,10 +224,12 @@ tasks.register('javadocJar', Jar) {
     archiveClassifier.set("javadoc")
     from tasks.named("javadoc")
 }
+
 tasks.withType(Javadoc).configureEach {
     options.encoding = "UTF-8"
     options.addStringOption("Xdoclint:none", "-quiet")
 }
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
