@@ -1,7 +1,6 @@
 package com.palordersoftworks.luaj.accesswidener;
 
 import net.fabricmc.loader.api.FabricLoader;
-import party.iroiro.luajava.Lua;
 import party.iroiro.luajava.luajit.LuaJit;
 
 import java.io.IOException;
@@ -84,7 +83,7 @@ public final class LuaScriptManager {
 
     private ScriptHandle createRuntime(String name, Path file) {
         try {
-            Lua lua = new LuaJit();
+            LuaJit lua = new LuaJit();
             lua.openLibraries();
 
             HostApi host = new HostApi(this);
@@ -95,7 +94,7 @@ public final class LuaScriptManager {
             Path bootstrap = FabricLoader.getInstance()
                     .getModContainer("brokenstarsmp")
                     .orElseThrow()
-                    .findPath("lua/bootstrap.lua")
+                    .findPath("src/main/lua/apis/bootstrap.lua")
                     .orElse(null);
 
             if (bootstrap != null && Files.exists(bootstrap)) {
@@ -143,9 +142,9 @@ public final class LuaScriptManager {
     private static final class ScriptHandle {
         private final String name;
         private final Path file;
-        private final Lua lua;
+        private final LuaJit lua;
 
-        private ScriptHandle(String name, Path file, Lua lua) {
+        private ScriptHandle(String name, Path file, LuaJit lua) {
             this.name = name;
             this.file = file;
             this.lua = lua;
