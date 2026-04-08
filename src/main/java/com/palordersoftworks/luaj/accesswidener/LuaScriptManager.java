@@ -139,41 +139,32 @@ public final class LuaScriptManager {
         return dot >= 0 ? fileName.substring(0, dot) : fileName;
     }
 
-    private static final class ScriptHandle {
-        private final String name;
-        private final Path file;
-        private final LuaJit lua;
-
-        private ScriptHandle(String name, Path file, LuaJit lua) {
-            this.name = name;
-            this.file = file;
-            this.lua = lua;
-        }
+    private record ScriptHandle(String name, Path file, LuaJit lua) {
 
         private boolean runFile() {
-            if (file == null) return false;
-            try {
-                lua.run(Files.readString(file, StandardCharsets.UTF_8));
-                return true;
-            } catch (Exception e) {
-                return false;
+                if (file == null) return false;
+                try {
+                    lua.run(Files.readString(file, StandardCharsets.UTF_8));
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
             }
-        }
 
-        private boolean runCode(String code) {
-            try {
-                lua.run(code);
-                return true;
-            } catch (Exception e) {
-                return false;
+            private boolean runCode(String code) {
+                try {
+                    lua.run(code);
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
             }
-        }
 
-        private void stop() {
-            try {
-                lua.close();
-            } catch (Exception ignored) {
+            private void stop() {
+                try {
+                    lua.close();
+                } catch (Exception ignored) {
+                }
             }
         }
-    }
 }
