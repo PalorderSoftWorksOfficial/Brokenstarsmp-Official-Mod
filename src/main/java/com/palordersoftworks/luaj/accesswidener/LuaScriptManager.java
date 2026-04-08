@@ -1,36 +1,67 @@
 package com.palordersoftworks.luaj.accesswidener;
 
+import com.palordersoftworks.luaj.sandboxing.SandboxProcess;
 import net.fabricmc.loader.api.FabricLoader;
-import party.iroiro.luajava.luajit.LuaJit;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 public final class LuaScriptManager {
+    private static final int DEFAULT_POOL_SIZE = 5;
+    private static final long DEFAULT_MEMORY_LIMIT_MB = 128;
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofMillis(250);
+
     private final Path root = FabricLoader.getInstance().getConfigDir().resolve("lua/scripts");
     private final Map<String, ScriptHandle> scripts = new ConcurrentHashMap<>();
+    private final Deque<SandboxProcess> idleWorkers = new ArrayDeque<>();
+    private final Object poolLock = new Object();
+
+    private final int poolSize;
+    private final long memoryLimitMb;
+    private final Duration timeout;
+
+    private volatile Consumer<String> malwareAlertSink = message -> System.err.println(message);
 
     public LuaScriptManager() {
+        this(DEFAULT_POOL_SIZE, DEFAULT_MEMORY_LIMIT_MB, DEFAULT_TIMEOUT);
+    }
+
+    public LuaScriptManager(int poolSize, long memoryLimitMb, Duration timeout) {
+        this.poolSize = Math.max(1, poolSize);
+        this.memoryLimitMb = Math.max(64, memoryLimitMb);
+        this.timeout = timeout == null ? DEFAULT_TIMEOUT : timeout;
         try {
             Files.createDirectories(root);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        warmPool();
     }
 
-    public synchronized List<String> reloadAll() {
+    public void setMalwareAlertSink(Consumer<String> sink) {
+        this.malwareAlertSink = sink == null ? System.err::println : sink;
+    }
+
+    public List<String> reloadAll() {
         stopAll();
+        warmPool();
         List<String> loaded = new ArrayList<>();
         for (Path file : scanFiles()) {
             String name = scriptName(file);
@@ -41,59 +72,82 @@ public final class LuaScriptManager {
         return loaded;
     }
 
-    public synchronized boolean load(String name) {
+    public boolean load(String name) {
         return load(name, null);
     }
 
-    public synchronized boolean load(String name, ScriptHost host) {
+    public boolean load(String name, ScriptHost host) {
         Path file = findFile(name);
-        if (file == null) return false;
-        return load(name, file, host);
+        if (file == null) {
+            return false;
+        }
+        scripts.put(name, new ScriptHandle(name, file, host));
+        return true;
     }
-
-    public synchronized boolean run(String name) {
+    private boolean load(String name, Path file, ScriptHost host) {
+        if (!isSafeName(name)) {
+            return false;
+        }
+        ScriptHandle handle = new ScriptHandle(name, file, host);
+        scripts.put(name, handle);
+        return true;
+    }
+    public boolean run(String name) {
         return run(name, null);
     }
 
-    public synchronized boolean run(String name, ScriptHost host) {
+    public boolean run(String name, ScriptHost host) {
+        if (!isSafeName(name)) {
+            return false;
+        }
+
         ScriptHandle handle = scripts.get(name);
         if (handle == null) {
-            if (!load(name, host)) return false;
-            handle = scripts.get(name);
+            Path file = findFile(name);
+            if (file == null) {
+                return false;
+            }
+            handle = new ScriptHandle(name, file, host);
+            scripts.put(name, handle);
+        } else if (host != null) {
+            handle.setHost(host);
         }
-        if (handle == null) return false;
+
         return handle.runFile();
     }
 
-    public synchronized boolean runCode(String code) {
+    public boolean runCode(String code) {
         return runCode(code, null);
     }
 
-    public synchronized boolean runCode(String code, ScriptHost host) {
-        ScriptHandle handle = createRuntime("console", null, host);
-        if (handle == null) return false;
+    public boolean runCode(String code, ScriptHost host) {
+        ScriptHandle handle = new ScriptHandle("console", null, host);
         return handle.runCode(code);
     }
 
-    public synchronized boolean pushInput(String name, String input) {
+    public boolean pushInput(String name, String input) {
         ScriptHandle handle = scripts.get(name);
-        if (handle == null) return false;
+        if (handle == null) {
+            return false;
+        }
         handle.pushInput(input);
         return true;
     }
 
-    public synchronized boolean stop(String name) {
-        ScriptHandle handle = scripts.remove(name);
-        if (handle == null) return false;
-        handle.stop();
-        return true;
+    public boolean stop(String name) {
+        return scripts.remove(name) != null;
     }
 
-    public synchronized void stopAll() {
-        for (ScriptHandle handle : scripts.values()) {
-            handle.stop();
-        }
+    public void stopAll() {
         scripts.clear();
+        synchronized (poolLock) {
+            while (!idleWorkers.isEmpty()) {
+                try {
+                    idleWorkers.removeFirst().close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     public Set<String> listLoaded() {
@@ -104,70 +158,151 @@ public final class LuaScriptManager {
         return root;
     }
 
-    private boolean load(String name, Path file, ScriptHost host) {
-        ScriptHandle handle = createRuntime(name, file, host);
-        if (handle == null) return false;
-        scripts.put(name, handle);
-        return true;
+    private boolean executeSandboxed(String scriptName, ScriptHost host, String code) {
+        SandboxProcess worker = borrowWorker();
+        try {
+            SandboxProcess.ExecutionResult result = worker.execute(code, timeout);
+
+            if (result.suspicious()) {
+                String message = "malware alert in script '" + scriptName + "': " + result.error();
+                malwareAlertSink.accept(message);
+                if (host != null) {
+                    host.error(message);
+                    if (result.output() != null && !result.output().isBlank()) {
+                        host.error(result.output());
+                    }
+                } else {
+                    System.err.println(message);
+                    if (result.output() != null && !result.output().isBlank()) {
+                        System.err.println(result.output());
+                    }
+                }
+                return false;
+            }
+
+            if (!result.success()) {
+                String text = result.output();
+                if (text == null || text.isBlank()) {
+                    text = result.error() == null ? "script failed" : result.error();
+                }
+                if (host != null) {
+                    host.error(text);
+                } else {
+                    System.err.println(text);
+                }
+                return false;
+            }
+
+            if (result.output() != null && !result.output().isBlank()) {
+                System.out.print(result.output());
+            }
+
+            return true;
+        } catch (Exception e) {
+            String text = stackTrace(e);
+            if (host != null) {
+                host.error(text);
+            } else {
+                System.err.println(text);
+            }
+            return false;
+        } finally {
+            try {
+                worker.close();
+            } catch (Exception ignored) {
+            }
+            replenishPool();
+        }
     }
 
-    private ScriptHandle createRuntime(String name, Path file, ScriptHost host) {
+    private SandboxProcess borrowWorker() {
+        synchronized (poolLock) {
+            SandboxProcess worker = idleWorkers.pollFirst();
+            if (worker != null) {
+                return worker;
+            }
+        }
         try {
-            LuaJit lua = new LuaJit();
-            lua.openLibraries();
+            return SandboxProcess.start(memoryLimitMb);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-            if (host != null) {
-                lua.set("host", host);
+    private void replenishPool() {
+        synchronized (poolLock) {
+            if (idleWorkers.size() >= poolSize) {
+                return;
             }
-
-            lua.set("SCRIPT_NAME", name);
-            lua.set("SCRIPT_DIR", root.toString());
-
-            Path bootstrap = FabricLoader.getInstance()
-                    .getModContainer("brokenstarsmp")
-                    .orElseThrow()
-                    .findPath("src/main/lua/apis/bootstrap.lua")
-                    .orElse(null);
-
-            if (bootstrap != null && Files.exists(bootstrap)) {
-                lua.run(Files.readString(bootstrap, StandardCharsets.UTF_8));
-            }
-
-            return new ScriptHandle(name, file, lua, host);
-        } catch (Exception e) {
-            if (host != null) {
-                host.error(stackTrace(e));
-            } else {
+            try {
+                idleWorkers.addLast(SandboxProcess.start(memoryLimitMb));
+            } catch (IOException e) {
                 System.err.println(stackTrace(e));
             }
-            return null;
+        }
+    }
+
+    private void warmPool() {
+        synchronized (poolLock) {
+            while (idleWorkers.size() < poolSize) {
+                try {
+                    idleWorkers.addLast(SandboxProcess.start(memoryLimitMb));
+                } catch (IOException e) {
+                    System.err.println(stackTrace(e));
+                    break;
+                }
+            }
         }
     }
 
     private List<Path> scanFiles() {
-        if (!Files.exists(root)) return List.of();
-        try {
-            try (var stream = Files.walk(root)) {
-                return stream
-                        .filter(Files::isRegularFile)
-                        .filter(p -> {
-                            String s = p.getFileName().toString().toLowerCase(Locale.ROOT);
-                            return s.endsWith(".lua") || s.endsWith(".luau");
-                        })
-                        .sorted()
-                        .toList();
-            }
+        if (!Files.exists(root)) {
+            return List.of();
+        }
+        try (var stream = Files.walk(root)) {
+            return stream
+                    .filter(p -> Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS))
+                    .filter(p -> {
+                        String s = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                        return s.endsWith(".lua") || s.endsWith(".luau");
+                    })
+                    .sorted()
+                    .toList();
         } catch (IOException e) {
             return List.of();
         }
     }
 
     private Path findFile(String name) {
-        Path lua = root.resolve(name + ".lua");
-        Path luau = root.resolve(name + ".luau");
-        if (Files.isRegularFile(lua)) return lua;
-        if (Files.isRegularFile(luau)) return luau;
+        if (!isSafeName(name)) {
+            return null;
+        }
+
+        Path lua = safeResolve(name + ".lua");
+        Path luau = safeResolve(name + ".luau");
+
+        if (lua != null && Files.isRegularFile(lua, LinkOption.NOFOLLOW_LINKS)) {
+            return lua;
+        }
+        if (luau != null && Files.isRegularFile(luau, LinkOption.NOFOLLOW_LINKS)) {
+            return luau;
+        }
         return null;
+    }
+
+    private Path safeResolve(String relative) {
+        Path candidate = root.resolve(relative).normalize();
+        if (!candidate.startsWith(root)) {
+            return null;
+        }
+        return candidate;
+    }
+
+    private boolean isSafeName(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        return name.matches("[A-Za-z0-9._-]+");
     }
 
     private String scriptName(Path file) {
@@ -182,13 +317,28 @@ public final class LuaScriptManager {
         return sw.toString();
     }
 
-    private record ScriptHandle(String name, Path file, LuaJit lua, ScriptHost host) {
+    private final class ScriptHandle {
+        private final String name;
+        private final Path file;
+        private volatile ScriptHost host;
+
+        private ScriptHandle(String name, Path file, ScriptHost host) {
+            this.name = name;
+            this.file = file;
+            this.host = host;
+        }
+
+        private void setHost(ScriptHost host) {
+            this.host = host;
+        }
 
         private boolean runFile() {
-            if (file == null) return false;
+            if (file == null) {
+                return false;
+            }
             try {
-                lua.run(Files.readString(file, StandardCharsets.UTF_8));
-                return true;
+                String code = Files.readString(file, StandardCharsets.UTF_8);
+                return executeSandboxed(name, host, code);
             } catch (Exception e) {
                 reportError(e);
                 return false;
@@ -196,34 +346,23 @@ public final class LuaScriptManager {
         }
 
         private boolean runCode(String code) {
-            try {
-                lua.run(code);
-                return true;
-            } catch (Exception e) {
-                reportError(e);
-                return false;
-            }
+            return executeSandboxed(name, host, code);
         }
 
         private void pushInput(String input) {
-            if (host != null) {
-                host.pushInput(input);
+            ScriptHost current = host;
+            if (current != null) {
+                current.pushInput(input);
             }
         }
 
         private void reportError(Throwable e) {
             String text = stackTrace(e);
-            if (host != null) {
-                host.error(text);
+            ScriptHost current = host;
+            if (current != null) {
+                current.error(text);
             } else {
                 System.err.println(text);
-            }
-        }
-
-        private void stop() {
-            try {
-                lua.close();
-            } catch (Exception ignored) {
             }
         }
     }
