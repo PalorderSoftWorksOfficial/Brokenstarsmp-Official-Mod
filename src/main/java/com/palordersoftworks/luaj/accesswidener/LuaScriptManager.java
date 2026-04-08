@@ -4,9 +4,17 @@ import net.fabricmc.loader.api.FabricLoader;
 import party.iroiro.luajava.luajit.LuaJit;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class LuaScriptManager {
@@ -26,7 +34,7 @@ public final class LuaScriptManager {
         List<String> loaded = new ArrayList<>();
         for (Path file : scanFiles()) {
             String name = scriptName(file);
-            if (load(name, file)) {
+            if (load(name, file, null)) {
                 loaded.add(name);
             }
         }
@@ -34,22 +42,44 @@ public final class LuaScriptManager {
     }
 
     public synchronized boolean load(String name) {
+        return load(name, null);
+    }
+
+    public synchronized boolean load(String name, ScriptHost host) {
         Path file = findFile(name);
         if (file == null) return false;
-        return load(name, file);
+        return load(name, file, host);
     }
 
     public synchronized boolean run(String name) {
+        return run(name, null);
+    }
+
+    public synchronized boolean run(String name, ScriptHost host) {
         ScriptHandle handle = scripts.get(name);
         if (handle == null) {
-            if (!load(name)) return false;
+            if (!load(name, host)) return false;
             handle = scripts.get(name);
         }
-        return handle != null && handle.runFile();
+        if (handle == null) return false;
+        return handle.runFile();
     }
 
     public synchronized boolean runCode(String code) {
-        return createRuntime("console", null).runCode(code);
+        return runCode(code, null);
+    }
+
+    public synchronized boolean runCode(String code, ScriptHost host) {
+        ScriptHandle handle = createRuntime("console", null, host);
+        if (handle == null) return false;
+        return handle.runCode(code);
+    }
+
+    public synchronized boolean pushInput(String name, String input) {
+        ScriptHandle handle = scripts.get(name);
+        if (handle == null) return false;
+        handle.pushInput(input);
+        return true;
     }
 
     public synchronized boolean stop(String name) {
@@ -74,20 +104,22 @@ public final class LuaScriptManager {
         return root;
     }
 
-    private boolean load(String name, Path file) {
-        ScriptHandle handle = createRuntime(name, file);
+    private boolean load(String name, Path file, ScriptHost host) {
+        ScriptHandle handle = createRuntime(name, file, host);
         if (handle == null) return false;
         scripts.put(name, handle);
         return true;
     }
 
-    private ScriptHandle createRuntime(String name, Path file) {
+    private ScriptHandle createRuntime(String name, Path file, ScriptHost host) {
         try {
             LuaJit lua = new LuaJit();
             lua.openLibraries();
 
-            HostApi host = new HostApi(this);
-            lua.set("host", host);
+            if (host != null) {
+                lua.set("host", host);
+            }
+
             lua.set("SCRIPT_NAME", name);
             lua.set("SCRIPT_DIR", root.toString());
 
@@ -101,8 +133,13 @@ public final class LuaScriptManager {
                 lua.run(Files.readString(bootstrap, StandardCharsets.UTF_8));
             }
 
-            return new ScriptHandle(name, file, lua);
+            return new ScriptHandle(name, file, lua, host);
         } catch (Exception e) {
+            if (host != null) {
+                host.error(stackTrace(e));
+            } else {
+                System.err.println(stackTrace(e));
+            }
             return null;
         }
     }
@@ -139,32 +176,55 @@ public final class LuaScriptManager {
         return dot >= 0 ? fileName.substring(0, dot) : fileName;
     }
 
-    private record ScriptHandle(String name, Path file, LuaJit lua) {
+    private static String stackTrace(Throwable t) {
+        StringWriter sw = new StringWriter();
+        t.printStackTrace(new PrintWriter(sw));
+        return sw.toString();
+    }
+
+    private record ScriptHandle(String name, Path file, LuaJit lua, ScriptHost host) {
 
         private boolean runFile() {
-                if (file == null) return false;
-                try {
-                    lua.run(Files.readString(file, StandardCharsets.UTF_8));
-                    return true;
-                } catch (Exception e) {
-                    return false;
-                }
-            }
-
-            private boolean runCode(String code) {
-                try {
-                    lua.run(code);
-                    return true;
-                } catch (Exception e) {
-                    return false;
-                }
-            }
-
-            private void stop() {
-                try {
-                    lua.close();
-                } catch (Exception ignored) {
-                }
+            if (file == null) return false;
+            try {
+                lua.run(Files.readString(file, StandardCharsets.UTF_8));
+                return true;
+            } catch (Exception e) {
+                reportError(e);
+                return false;
             }
         }
+
+        private boolean runCode(String code) {
+            try {
+                lua.run(code);
+                return true;
+            } catch (Exception e) {
+                reportError(e);
+                return false;
+            }
+        }
+
+        private void pushInput(String input) {
+            if (host != null) {
+                host.pushInput(input);
+            }
+        }
+
+        private void reportError(Throwable e) {
+            String text = stackTrace(e);
+            if (host != null) {
+                host.error(text);
+            } else {
+                System.err.println(text);
+            }
+        }
+
+        private void stop() {
+            try {
+                lua.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
 }

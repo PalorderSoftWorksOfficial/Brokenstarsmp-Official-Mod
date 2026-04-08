@@ -5,6 +5,7 @@ import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
 import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.economycraft.wand.SellWand;
+import com.palordersoftworks.luaj.accesswidener.LuaCommands;
 import com.palordersoftworks.luaj.accesswidener.LuaScriptManager;
 
 import net.fabricmc.api.ModInitializer;
@@ -83,41 +84,6 @@ public class DropAtFeet implements ModInitializer {
 
             return ActionResult.SUCCESS;
         });
-        CommandRegistrationCallback.EVENT.register(
-                (dispatcher, registryAccess, environment) -> {
-                    dispatcher.register(CommandManager.literal("lua")
-                            .requires(CommandManager.requirePermissionLevel(CommandManager.GAMEMASTERS_CHECK))
-                            .then(CommandManager.literal("reload").executes(ctx -> {
-                                LUA.reloadAll();
-                                return 1;
-                            }))
-                            .then(CommandManager.literal("load")
-                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
-                                        String script = StringArgumentType.getString(ctx, "script");
-                                        return LUA.load(script) ? 1 : 0;
-                                    })))
-                            .then(CommandManager.literal("unload")
-                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
-                                        String script = StringArgumentType.getString(ctx, "script");
-                                        return LUA.stop(script) ? 1 : 0;
-                                    })))
-                            .then(CommandManager.literal("run")
-                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
-                                        String script = StringArgumentType.getString(ctx, "script");
-                                        return LUA.run(script) ? 1 : 0;
-                                    })))
-                            .then(CommandManager.literal("stop")
-                                    .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
-                                        String script = StringArgumentType.getString(ctx, "script");
-                                        return LUA.stop(script) ? 1 : 0;
-                                    })))
-                            .then(CommandManager.literal("runCode")
-                                    .then(CommandManager.argument("code", StringArgumentType.greedyString()).executes(ctx -> {
-                                        String code = StringArgumentType.getString(ctx, "code");
-                                        return LUA.runCode(code) ? 1 : 0;
-                                    })))
-                    );
-                }
-        );
+        LuaCommands.register();
     }
 }

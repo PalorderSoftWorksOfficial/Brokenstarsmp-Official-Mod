@@ -1,116 +1,190 @@
-local function cap(s)
-  return (s:gsub("^%l", string.upper))
-end
+package com.palordersoftworks.luaj.accesswidener;
 
-local wrap
+import net.fabricmc.loader.api.FabricLoader;
+import party.iroiro.luajava.luajit.LuaJit;
 
-local function auto(v)
-  if type(v) == "userdata" then
-    return wrap(v)
-  end
-  return v
-end
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
-function wrap(value)
-  return setmetatable({}, {
-    __index = function(_, key)
-      local direct = value[key]
-      if direct ~= nil then
-        if type(direct) == "function" then
-          return function(_, ...)
-            return auto(direct(value, ...))
-          end
-        end
-        return auto(direct)
-      end
-      local getter = value["get" .. cap(key)]
-      if type(getter) == "function" then
-        return auto(getter(value))
-      end
-      local isGetter = value["is" .. cap(key)]
-      if type(isGetter) == "function" then
-        return auto(isGetter(value))
-      end
-      return nil
-    end,
-    __newindex = function(_, key, newValue)
-      local setter = value["set" .. cap(key)]
-      if type(setter) == "function" then
-        setter(value, newValue)
-        return
-      end
-      rawset(_, key, newValue)
-    end,
-    __call = function(_, ...)
-      return auto(value(...))
-    end
-  })
-end
+public final class LuaScriptManager {
+    private final Path root = FabricLoader.getInstance().getConfigDir().resolve("lua/scripts");
+    private final Map<String, ScriptHandle> sessions = new ConcurrentHashMap<>();
 
-local function makeNamespace(path)
-  return setmetatable({}, {
-    __index = function(self, key)
-      local full = path == "" and key or path .. "." .. key
-      local ok, cls = pcall(java.import, full)
-      if ok and cls ~= nil then
-        local proxy = setmetatable({}, {
-          __index = function(_, member)
-            local v = cls[member]
-            if v ~= nil then
-              if type(v) == "function" then
-                return function(_, ...)
-                  local ok1, res1 = pcall(v, ...)
-                  if ok1 then return auto(res1) end
-                  local ok2, res2 = pcall(v, cls, ...)
-                  if ok2 then return auto(res2) end
-                  error(res2)
-                end
-              end
-              return auto(v)
-            end
-            return nil
-          end,
-          __call = function(_, ...)
-            return auto(cls(...))
-          end
-        })
-        rawset(self, key, proxy)
-        return proxy
-      end
-      local ns = makeNamespace(full)
-      rawset(self, key, ns)
-      return ns
-    end
-  })
-end
+    public LuaScriptManager() {
+        try {
+            Files.createDirectories(root);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-_globalPackages = makeNamespace("")
-setmetatable(_G, {
-  __index = function(_, key)
-    return _globalPackages[key]
-  end
-})
+    public synchronized List<String> reloadAll() {
+        stopAll();
+        List<String> loaded = new ArrayList<>();
+        for (Path file : scanFiles()) {
+            loaded.add(scriptName(file));
+        }
+        return loaded;
+    }
 
-exports = {}
+    public synchronized boolean load(String sessionKey, String scriptName, ScriptHost host) {
+        Path file = findFile(scriptName);
+        if (file == null) return false;
+        ScriptHandle handle = createRuntime(sessionKey, file, host);
+        if (handle == null) return false;
+        sessions.put(sessionKey, handle);
+        return true;
+    }
 
-function export(name, value)
-  exports[name] = value
-  return value
-end
+    public synchronized boolean run(String sessionKey) {
+        ScriptHandle handle = sessions.get(sessionKey);
+        if (handle == null) return false;
+        return handle.runFile();
+    }
 
-function fetch(name)
-  return exports[name]
-end
+    public synchronized boolean runCode(String sessionKey, String code, ScriptHost host) {
+        ScriptHandle handle = createRuntime(sessionKey, null, host);
+        if (handle == null) return false;
+        sessions.put(sessionKey, handle);
+        return handle.runCode(code);
+    }
 
-luajava = {
-  newInstance = function(className, ...)
-    return auto(java.import(className)(...))
-  end,
-  bindClass = java.import,
-  new = java.new,
-  createProxy = java.proxy,
-  loadLib = function(className, methodName)
-    return java.loadlib(className, methodName)()
-  end,
-  unwrap = java.unwrap
+    public synchronized boolean pushInput(String sessionKey, String text) {
+        ScriptHandle handle = sessions.get(sessionKey);
+        if (handle == null) return false;
+        handle.host().pushInput(text);
+        return true;
+    }
+
+    public synchronized boolean stop(String sessionKey) {
+        ScriptHandle handle = sessions.remove(sessionKey);
+        if (handle == null) return false;
+        handle.stop();
+        return true;
+    }
+
+    public synchronized void stopAll() {
+        for (ScriptHandle handle : sessions.values()) {
+            handle.stop();
+        }
+        sessions.clear();
+    }
+
+    public Set<String> listLoaded() {
+        return new TreeSet<>(sessions.keySet());
+    }
+
+    public Path getRoot() {
+        return root;
+    }
+
+    private ScriptHandle createRuntime(String sessionKey, Path file, ScriptHost host) {
+        try {
+            LuaJit lua = new LuaJit();
+            lua.openLibraries();
+
+            lua.set("host", host);
+            lua.set("SCRIPT_SESSION", sessionKey);
+            lua.set("SCRIPT_NAME", file == null ? sessionKey : scriptName(file));
+            lua.set("SCRIPT_DIR", root.toString());
+
+            Path bootstrap = FabricLoader.getInstance()
+                    .getModContainer("brokenstarsmp")
+                    .orElseThrow()
+                    .findPath("src/main/lua/apis/bootstrap.lua")
+                    .orElse(null);
+
+            if (bootstrap != null && Files.exists(bootstrap)) {
+                lua.run(Files.readString(bootstrap, StandardCharsets.UTF_8));
+            }
+
+            return new ScriptHandle(sessionKey, file, lua, host);
+        } catch (Exception e) {
+            if (host != null) {
+                host.error(stackTrace(e));
+            }
+            return null;
+        }
+    }
+
+    private List<Path> scanFiles() {
+        if (!Files.exists(root)) return List.of();
+        try {
+            try (var stream = Files.walk(root)) {
+                return stream
+                        .filter(Files::isRegularFile)
+                        .filter(p -> {
+                            String s = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                            return s.endsWith(".lua") || s.endsWith(".luau");
+                        })
+                        .sorted()
+                        .toList();
+            }
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
+    private Path findFile(String name) {
+        Path lua = root.resolve(name + ".lua");
+        Path luau = root.resolve(name + ".luau");
+        if (Files.isRegularFile(lua)) return lua;
+        if (Files.isRegularFile(luau)) return luau;
+        return null;
+    }
+
+    private String scriptName(Path file) {
+        String fileName = file.getFileName().toString();
+        int dot = fileName.lastIndexOf('.');
+        return dot >= 0 ? fileName.substring(0, dot) : fileName;
+    }
+
+    private static String stackTrace(Throwable t) {
+        StringWriter sw = new StringWriter();
+        t.printStackTrace(new PrintWriter(sw));
+        return sw.toString();
+    }
+
+    private record ScriptHandle(String sessionKey, Path file, LuaJit lua, ScriptHost host) {
+
+        private boolean runFile() {
+            if (file == null) return false;
+            try {
+                lua.run(Files.readString(file, StandardCharsets.UTF_8));
+                return true;
+            } catch (Exception e) {
+                host.error(stackTrace(e));
+                return false;
+            }
+        }
+
+        private boolean runCode(String code) {
+            try {
+                lua.run(code);
+                return true;
+            } catch (Exception e) {
+                host.error(stackTrace(e));
+                return false;
+            }
+        }
+
+        private void stop() {
+            try {
+                lua.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
 }
