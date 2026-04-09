@@ -36,9 +36,12 @@ repositories {
 
     maven {
         name = 'PalorderHosting'
-        url = 'https://maven.palorderhosting.net/'
+        url = 'https://maven.palorderhosting.net/releases'
     }
-
+    maven {
+        name = 'FabricMC'
+        url = 'https://maven.fabricmc.net/'
+    }
     maven { url 'https://jitpack.io' }
 }
 

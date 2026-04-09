@@ -1,8 +1,8 @@
 pluginManagement {
     repositories {
         maven {
-            name = 'Palorderhosting'
-            url = 'https://maven.palorderhosting.net/'
+            name = 'PalorderHosting'
+            url = 'https://maven.palorderhosting.net/releases'
         }
         gradlePluginPortal()
     }
