@@ -15,7 +15,6 @@
     "ItemStack_stackableFilledShulkersMixin",
     "MinecraftServer_Mixin",
     "PrimedTntMixin",
-    "RedstoneWireBlock_fastMixin",
     "ServerPlayerEntity_Mixin"
   ],
   "client": [
