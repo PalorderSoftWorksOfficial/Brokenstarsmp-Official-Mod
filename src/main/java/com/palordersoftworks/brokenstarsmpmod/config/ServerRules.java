@@ -23,8 +23,6 @@ public class ServerRules {
     @Rule(desc = "Allow chests to be opened even if blocked", strict = true,name = "AllowChestOpeningUnderBlocks")
     public static boolean ALLOW_CHEST_OPENING = true;
 
-    @Rule(desc = "Whether Redstone Wire Optimizations are active",name = "fastRedstoneDust")
-    public static boolean REDSTONE_WIRE_TURBO = false;
     @Rule(
             desc = "Amount of items a dispenser drops per activation (0 = 1 item)",
             strict = true,

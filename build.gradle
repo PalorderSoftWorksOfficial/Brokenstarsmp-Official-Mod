@@ -15,15 +15,6 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-import org.apache.jackrabbit.webdav.client.methods.HttpMkcol
-import org.apache.http.impl.client.CloseableHttpClient
-import org.apache.http.impl.client.HttpClients
-import org.apache.http.auth.UsernamePasswordCredentials
-import org.apache.http.impl.client.BasicCredentialsProvider
-import org.apache.http.client.CredentialsProvider
-import org.apache.http.auth.AuthScope
-import org.apache.http.HttpStatus
-
 sourceCompatibility = JavaVersion.VERSION_21
 targetCompatibility = JavaVersion.VERSION_21
 
@@ -77,6 +68,8 @@ dependencies {
     // Pack into the final mod jar
     luaShadow "party.iroiro.luajava:luajit:4.1.0"
     luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
+
+    modCompileOnly(files("libs/essential_commands-0.38.6-mc1.21.11.jar"))
 }
 
 processResources {
@@ -103,53 +96,6 @@ tasks.named("shadowJar") {
 tasks.named("remapJar") {
     dependsOn tasks.named("shadowJar")
     inputFile.set(tasks.named("shadowJar").flatMap { it.archiveFile })
-}
-
-def createVersionFolderTask = tasks.register('createVersionFolder') {
-    doLast {
-        def version = project.version
-        def groupPath = project.group.toString().replace('.', '/')
-        def artifactId = project.archivesBaseName
-        def baseUrl = "https://maven.palorderhosting.net/"
-
-        CredentialsProvider creds = new BasicCredentialsProvider()
-        creds.setCredentials(
-                AuthScope.ANY,
-                new UsernamePasswordCredentials(
-                        System.getenv("MAVEN_USERNAME"),
-                        System.getenv("MAVEN_PASSWORD")
-                )
-        )
-
-        CloseableHttpClient client = HttpClients.custom()
-                .setDefaultCredentialsProvider(creds)
-                .build()
-
-        try {
-            def ensurePath = { httpClient, base, path ->
-                def parts = path.split("/")
-                def current = base
-                parts.each { p ->
-                    if (p.trim().isEmpty()) return
-                    current += p + "/"
-                    def mk = new HttpMkcol(current)
-                    def response = httpClient.execute(mk)
-                    def code = response.getStatusLine().getStatusCode()
-                    if (!(code == HttpStatus.SC_CREATED || code == HttpStatus.SC_METHOD_NOT_ALLOWED)) {
-                        throw new GradleException("MKCOL failed for ${current} HTTP $code")
-                    }
-                    response.getEntity()?.getContent()?.close()
-                }
-            }
-
-            def fullPath = "${groupPath}/${artifactId}/${version}/"
-            ensurePath(client, baseUrl, fullPath)
-
-            println "Version folder created (or already exists): ${baseUrl}${fullPath}"
-        } finally {
-            client.close()
-        }
-    }
 }
 
 def bumpVersionLogic = { type ->
