@@ -1,6 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.EnderChestInventory;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.inventory.SimpleInventory;
@@ -40,13 +41,11 @@ public class EnderchestCommand_Mixin {
     @Unique
     private static SimpleInventory loadSnapshot(int size, ItemStack[] stored) {
         SimpleInventory inv = new SimpleInventory(size);
-
         for (int i = 0; i < size; i++) {
             if (stored != null && i < stored.length && stored[i] != null && !stored[i].isEmpty()) {
                 inv.setStack(i, stored[i].copy());
             }
         }
-
         return inv;
     }
 
@@ -55,7 +54,7 @@ public class EnderchestCommand_Mixin {
         SNAPSHOTS.put(uuid, snapshotOf(inv));
     }
 
-    @Inject(method = "getScreenHandlerFactory*", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getScreenHandlerFactory", at = @At("HEAD"), cancellable = true)
     private void brokenstarsmp$replaceFactory(CallbackInfoReturnable<NamedScreenHandlerFactory> cir) {
         cir.setReturnValue(new SimpleNamedScreenHandlerFactory((syncId, inventory, player) -> {
             EnderChestInventory echestInventory = player.getEnderChestInventory();
@@ -64,13 +63,10 @@ public class EnderchestCommand_Mixin {
 
             if (echestInventory.size() == 27) {
                 SimpleInventory snapshot = loadSnapshot(27, stored);
-                return new GenericContainerScreenHandler(
-                        GenericContainerScreenHandler.createGeneric9x3(syncId, inventory, snapshot).getType(),
-                        syncId,
-                        inventory,
-                        snapshot,
-                        3
-                ) {
+                GenericContainerScreenHandler base =
+                        GenericContainerScreenHandler.createGeneric9x3(syncId, inventory, snapshot);
+
+                return new GenericContainerScreenHandler(base.getType(), syncId, inventory, snapshot, 3) {
                     @Override
                     public void onClosed(PlayerEntity playerEntity) {
                         super.onClosed(playerEntity);
@@ -79,26 +75,25 @@ public class EnderchestCommand_Mixin {
                         }
                     }
                 };
-            } else if (echestInventory.size() == 54) {
-                SimpleInventory snapshot = loadSnapshot(54, stored);
-                return new GenericContainerScreenHandler(
-                        GenericContainerScreenHandler.createGeneric9x6(syncId, inventory, snapshot).getType(),
-                        syncId,
-                        inventory,
-                        snapshot,
-                        6
-                ) {
-                    @Override
-                    public void onClosed(PlayerEntity playerEntity) {
-                        super.onClosed(playerEntity);
-                        if (playerEntity instanceof ServerPlayerEntity serverPlayer) {
-                            saveSnapshot(serverPlayer.getUuid(), snapshot);
-                        }
-                    }
-                };
-            } else {
-                return GenericContainerScreenHandler.createGeneric9x3(syncId, inventory, echestInventory);
             }
+
+            if (echestInventory.size() == 54) {
+                SimpleInventory snapshot = loadSnapshot(54, stored);
+                GenericContainerScreenHandler base =
+                        GenericContainerScreenHandler.createGeneric9x6(syncId, inventory, snapshot);
+
+                return new GenericContainerScreenHandler(base.getType(), syncId, inventory, snapshot, 6) {
+                    @Override
+                    public void onClosed(PlayerEntity playerEntity) {
+                        super.onClosed(playerEntity);
+                        if (playerEntity instanceof ServerPlayerEntity serverPlayer) {
+                            saveSnapshot(serverPlayer.getUuid(), snapshot);
+                        }
+                    }
+                };
+            }
+
+            return GenericContainerScreenHandler.createGeneric9x3(syncId, inventory, echestInventory);
         }, Text.translatable("container.enderchest")));
     }
 }
