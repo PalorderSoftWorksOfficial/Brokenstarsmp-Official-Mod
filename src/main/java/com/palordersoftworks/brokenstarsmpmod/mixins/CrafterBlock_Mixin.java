@@ -2,6 +2,7 @@ package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
 import net.minecraft.advancement.criterion.Criteria;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.CrafterBlock;
 import net.minecraft.block.dispenser.ItemDispenserBehavior;
@@ -37,6 +38,7 @@ public abstract class CrafterBlock_Mixin {
 
         CraftingRecipeInput input = crafter.createRecipeInput();
         Optional<RecipeEntry<CraftingRecipe>> optional = CrafterBlock.getCraftingRecipe(world, input);
+
         if (optional.isEmpty()) {
             world.syncWorldEvent(1050, pos, 0);
             ci.cancel();
@@ -55,9 +57,7 @@ public abstract class CrafterBlock_Mixin {
             }
         }
 
-        if (possibleBatches <= 0) {
-            possibleBatches = 1;
-        }
+        if (possibleBatches <= 0) possibleBatches = 1;
 
         ItemStack output = recipe.craft(input, world.getRegistryManager());
         if (output.isEmpty()) {
@@ -67,15 +67,18 @@ public abstract class CrafterBlock_Mixin {
         }
 
         int scaledCount = Math.min(output.getCount() * possibleBatches, output.getMaxCount());
-        output = output.copy();
-        output.setCount(scaledCount);
+        ItemStack finalOutput = output.copy();
+        finalOutput.setCount(scaledCount);
 
+        // vanilla-like state change (minimal updates)
         crafter.setCraftingTicksRemaining(6);
-        world.setBlockState(pos, state.with(CrafterBlock.CRAFTING, true), 2);
-        output.onCraftByCrafter(world);
+        world.setBlockState(pos, state.with(CrafterBlock.CRAFTING, true), Block.NOTIFY_LISTENERS);
 
-        brokenstarsmpmod$transferOrSpawnStack(world, pos, crafter, output, state, recipeEntry);
+        finalOutput.onCraftByCrafter(world);
 
+        brokenstarsmpmod$transferOrSpawnStack(world, pos, crafter, finalOutput, state, recipeEntry);
+
+        // consume inputs
         for (ItemStack stack : crafter.getHeldStacks()) {
             if (!stack.isEmpty()) {
                 stack.decrement(Math.min(possibleBatches, stack.getCount()));
@@ -87,27 +90,29 @@ public abstract class CrafterBlock_Mixin {
     }
 
     @Unique
-    private void brokenstarsmpmod$transferOrSpawnStack(ServerWorld world, BlockPos pos, CrafterBlockEntity blockEntity,
-                                                       ItemStack stack, BlockState state, RecipeEntry<?> recipe) {
+    private void brokenstarsmpmod$transferOrSpawnStack(ServerWorld world, BlockPos pos,
+                                                       CrafterBlockEntity blockEntity,
+                                                       ItemStack stack,
+                                                       BlockState state,
+                                                       RecipeEntry<?> recipe) {
+
         Direction direction = state.get(CrafterBlock.ORIENTATION).getFacing();
         Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos.offset(direction));
 
-        ItemStack toTransfer = stack.copy();
+        ItemStack remaining = stack.copy();
 
         if (inventory != null && !(inventory instanceof CrafterBlockEntity)) {
-            while (!toTransfer.isEmpty()) {
-                int prevCount = toTransfer.getCount();
-                toTransfer = HopperBlockEntity.transfer(blockEntity, inventory, toTransfer, direction.getOpposite());
-                if (prevCount == toTransfer.getCount()) break;
-            }
+            remaining = HopperBlockEntity.transfer(blockEntity, inventory, remaining, direction.getOpposite());
         }
 
-        if (!toTransfer.isEmpty()) {
+        if (!remaining.isEmpty()) {
             Vec3d center = Vec3d.ofCenter(pos);
             Vec3d spawnPos = center.offset(direction, 0.7);
-            ItemDispenserBehavior.spawnItem(world, toTransfer, 6, direction, spawnPos);
 
-            for (ServerPlayerEntity player : world.getNonSpectatingEntities(ServerPlayerEntity.class, Box.of(center, 17, 17, 17))) {
+            ItemDispenserBehavior.spawnItem(world, remaining, 6, direction, spawnPos);
+
+            for (ServerPlayerEntity player :
+                    world.getNonSpectatingEntities(ServerPlayerEntity.class, Box.of(center, 17, 17, 17))) {
                 Criteria.CRAFTER_RECIPE_CRAFTED.trigger(player, recipe.id(), blockEntity.getHeldStacks());
             }
 
