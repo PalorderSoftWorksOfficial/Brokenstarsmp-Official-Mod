@@ -196,7 +196,7 @@ publishing {
     repositories {
         maven {
             name = "palorderHosting"
-            url = uri("https://maven.palorderhosting.net/")
+            url = uri("https://maven.palorderhosting.net/releases/")
             credentials {
                 username = System.getenv("MAVEN_USERNAME")
                 password = System.getenv("MAVEN_PASSWORD")
