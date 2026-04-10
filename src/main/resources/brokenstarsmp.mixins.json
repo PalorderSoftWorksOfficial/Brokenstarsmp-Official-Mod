@@ -15,7 +15,6 @@
     "ItemGroups_Mixin",
     "ItemStack_stackableFilledShulkersMixin",
     "MinecraftServer_Mixin",
-    "PrimedTntMixin",
     "ServerPlayerEntity_Mixin"
   ],
   "client": [
