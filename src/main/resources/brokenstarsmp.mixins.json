@@ -9,6 +9,7 @@
     "BeehiveBlockEntity_Mixin",
     "ChestBlock_Mixin",
     "CrafterBlock_Mixin",
+    "DropperBlock_Mixin",
     "EnderchestCommand_Mixin",
     "ExperienceOrbEntity_Mixin",
     "ItemDispenserBehaviorMixin",
