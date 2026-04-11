@@ -265,6 +265,11 @@ public final class ServerShopUi {
 
         @Override
         public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
+            if (slot < 0) {
+                super.onSlotClick(slot, dragType, type, player);
+                return;
+            }
+
             if (type == SlotActionType.PICKUP || type == SlotActionType.QUICK_MOVE) {
                 if (slot < navRowStart) {
                     int index = slotToIndex[slot];
@@ -390,10 +395,15 @@ public final class ServerShopUi {
 
         @Override
         public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
+            if (slot < 0) {
+                super.onSlotClick(slot, dragType, type, player);
+                return;
+            }
+
             if (type == SlotActionType.PICKUP || type == SlotActionType.QUICK_MOVE) {
                 if (slot < navRowStart) {
                     int index = page * itemsPerPage + slot;
-                    if (index < subcategories.size()) {
+                    if (index >= 0 && index < subcategories.size()) {
                         String sub = subcategories.get(index);
                         openItems(viewer, eco, topCategory + "." + sub, sub);
                         return;
@@ -541,10 +551,15 @@ public final class ServerShopUi {
 
         @Override
         public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
+            if (slot < 0) {
+                super.onSlotClick(slot, dragType, type, player);
+                return;
+            }
+
             if (type == SlotActionType.PICKUP || type == SlotActionType.QUICK_MOVE) {
                 if (slot < navRowStart) {
                     int index = page * itemsPerPage + slot;
-                    if (index < entries.size()) {
+                    if (index >= 0 && index < entries.size()) {
                         handlePurchase(entries.get(index), type, dragType);
                         return;
                     }
@@ -756,6 +771,7 @@ public final class ServerShopUi {
         map.put(normalizeCategoryKey("Dyed"), IdentifierCompat.withDefaultNamespace("blue_dye"));
         map.put(normalizeCategoryKey("Discs"), IdentifierCompat.withDefaultNamespace("music_disc_strad"));
         map.put(normalizeCategoryKey("Economy"), IdentifierCompat.withDefaultNamespace("emerald"));
+        map.put(normalizeCategoryKey("Test category"), IdentifierCompat.withDefaultNamespace("command_block"));
         return map;
     }
 

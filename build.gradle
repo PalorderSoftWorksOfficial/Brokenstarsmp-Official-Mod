@@ -25,6 +25,8 @@ group = project.maven_group
 repositories {
     mavenCentral()
 
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://maven.nucleoid.xyz'}
     maven {
         name = 'PalorderHosting'
         url = 'https://maven.palorderhosting.net/releases'
@@ -33,11 +35,11 @@ repositories {
         name = 'FabricMC'
         url = 'https://maven.fabricmc.net/'
     }
-    maven { url 'https://jitpack.io' }
 }
 
 configurations {
     luaShadow
+    Shadow
 }
 
 dependencies {
@@ -56,6 +58,14 @@ dependencies {
     implementation "cc.tweaked:cc-tweaked-1.21.11-fabric-api:1.117.1"
 
     modImplementation "net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0"
+    // Polymer dependencies
+    modImplementation include("eu.pb4:polymer-core:0.15.2+1.21.11")
+    modImplementation include("eu.pb4:polymer-blocks:0.15.2+1.21.11")
+    modImplementation include("eu.pb4:polymer-resource-pack:0.15.2+1.21.11")
+    modImplementation include("eu.pb4:polymer-virtual-entity:0.15.2+1.21.11")
+    modImplementation include("eu.pb4:polymer-networking:0.15.2+1.21.11")
+
+
 
     // Dev runtime visibility
     modLocalRuntime "party.iroiro.luajava:luajit:4.1.0"
@@ -91,6 +101,7 @@ tasks.withType(JavaCompile) {
 tasks.named("shadowJar") {
     archiveClassifier.set("shadow")
     configurations = [project.configurations.luaShadow]
+    configurations = [project.configurations.Shadow]
 }
 
 tasks.named("remapJar") {
