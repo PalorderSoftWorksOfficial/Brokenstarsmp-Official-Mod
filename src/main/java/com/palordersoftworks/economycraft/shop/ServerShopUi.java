@@ -771,7 +771,7 @@ public final class ServerShopUi {
         map.put(normalizeCategoryKey("Dyed"), IdentifierCompat.withDefaultNamespace("blue_dye"));
         map.put(normalizeCategoryKey("Discs"), IdentifierCompat.withDefaultNamespace("music_disc_strad"));
         map.put(normalizeCategoryKey("Economy"), IdentifierCompat.withDefaultNamespace("emerald"));
-        map.put(normalizeCategoryKey("Test category"), IdentifierCompat.withDefaultNamespace("command_block"));
+        map.put(normalizeCategoryKey("Test Category"), IdentifierCompat.withDefaultNamespace("command_block"));
         return map;
     }
 
