@@ -1,0 +1,101 @@
+plugins {
+    id 'fabric-loom'
+    id 'maven-publish'
+    id 'org.jetbrains.kotlin.jvm' version '2.3.10'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+sourceCompatibility = JavaVersion.VERSION_21
+targetCompatibility = JavaVersion.VERSION_21
+
+group = project.maven_group
+version = project.mod_version
+archivesBaseName = project.archives_base_name
+
+repositories {
+    mavenCentral()
+
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://maven.nucleoid.xyz' }
+    maven {
+        name = 'PalorderHosting'
+        url = 'https://maven.palorderhosting.net/releases'
+    }
+    maven {
+        name = 'FabricMC'
+        url = 'https://maven.fabricmc.net/'
+    }
+    maven {
+        name = 'squiddev repository'
+        url = 'https://maven.squiddev.cc/'
+    }
+}
+
+configurations {
+    luaShadow
+    Shadow
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
+    compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.3")
+    compileOnly "io.github.llamalad7:mixinextras-common:0.5.3"
+    compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.3"
+
+    modImplementation "net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0"
+
+    modImplementation include("eu.pb4:polymer-core:0.14.4+1.21.10")
+    modImplementation include("eu.pb4:polymer-blocks:0.14.4+1.21.10")
+    modImplementation include("eu.pb4:polymer-resource-pack:0.14.4+1.21.10")
+    modImplementation include("eu.pb4:polymer-virtual-entity:0.14.4+1.21.10")
+    modImplementation include("eu.pb4:polymer-networking:0.14.4+1.21.10")
+
+    modLocalRuntime "party.iroiro.luajava:luajit:4.1.0"
+    modLocalRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
+
+    compileOnly "party.iroiro.luajava:luajit:4.1.0"
+    compileOnly "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
+
+    luaShadow "party.iroiro.luajava:luajit:4.1.0"
+    luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+loom {
+    accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+tasks.named("shadowJar") {
+    archiveClassifier.set("shadow")
+    configurations = [project.configurations.luaShadow, project.configurations.Shadow]
+}
+
+tasks.named("remapJar") {
+    dependsOn tasks.named("shadowJar")
+    inputFile.set(tasks.named("shadowJar").flatMap { it.archiveFile })
+}
+
+tasks.register("sourcesJar", Jar) {
+    archiveClassifier.set("sources")
+    from sourceSets.main.allSource
+}
+
+tasks.register("javadocJar", Jar) {
+    archiveClassifier.set("javadoc")
+    from tasks.named("javadoc")
+}

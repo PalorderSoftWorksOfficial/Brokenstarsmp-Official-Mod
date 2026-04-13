@@ -8,8 +8,8 @@ pluginManagement {
             name = 'FabricMC'
             url = 'https://maven.fabricmc.net/'
         }
+        maven { url = 'https://maven.neoforged.net' }
+        maven { url = 'https://repo.papermc.io/repository/maven-public/' }
         gradlePluginPortal()
     }
 }
-include("fabric-1.21.10")
-include("fabric-template")

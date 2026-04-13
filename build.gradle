@@ -27,13 +27,17 @@ repositories {
 
     maven { url 'https://jitpack.io' }
     maven { url 'https://maven.nucleoid.xyz'}
-    maven {
-        name = 'PalorderHosting'
-        url = 'https://maven.palorderhosting.net/releases'
-    }
+    //maven {
+        //name = 'PalorderHosting'
+        //url = 'https://maven.palorderhosting.net/releases'
+    //}
     maven {
         name = 'FabricMC'
         url = 'https://maven.fabricmc.net/'
+    }
+    maven {
+        name = 'squiddev repository'
+        url = 'https://maven.squiddev.cc/'
     }
 }
 
@@ -100,8 +104,7 @@ tasks.withType(JavaCompile) {
 
 tasks.named("shadowJar") {
     archiveClassifier.set("shadow")
-    configurations = [project.configurations.luaShadow]
-    configurations = [project.configurations.Shadow]
+    configurations = [project.configurations.luaShadow, project.configurations.Shadow]
 }
 
 tasks.named("remapJar") {
