@@ -18,7 +18,10 @@ repositories {
     maven { url 'https://maven.nucleoid.xyz' }
     maven { url 'https://maven.squiddev.cc/' }
 }
-
+configurations {
+    luaShadow
+    Shadow
+}
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}"
@@ -36,13 +39,8 @@ dependencies {
     luaShadow "party.iroiro.luajava:luajit:4.1.0"
 }
 
-configurations {
-    luaShadow
-    Shadow
-}
-
 loom {
-    accessWidenerPath = file("src/main/resources/mod.accesswidener")
+    accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
 }
 
 tasks.withType(JavaCompile).configureEach {

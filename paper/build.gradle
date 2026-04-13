@@ -1,0 +1,16 @@
+plugins {
+    id 'io.papermc.paperweight.userdev' version '2.0.0-beta.18'
+    id 'java'
+}
+
+group = project.maven_group
+version = project.mod_version
+
+repositories {
+    mavenCentral()
+    maven { url 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+dependencies {
+    paperweight.paperDevBundle("${minecraft_version}-R0.1-SNAPSHOT")
+}

@@ -8,8 +8,39 @@ pluginManagement {
             name = 'FabricMC'
             url = 'https://maven.fabricmc.net/'
         }
+        maven {
+            name = 'QuiltMC'
+            url = 'https://maven.quiltmc.org/repository/release'
+        }
+        maven {
+            name = 'Forge'
+            url = 'https://maven.minecraftforge.net/'
+        }
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases'
+        }
+        maven {
+            name = 'PaperMC'
+            url = 'https://repo.papermc.io/repository/maven-public/'
+        }
+        maven {
+            name = 'SpigotMC'
+            url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+        }
+        mavenCentral()
         gradlePluginPortal()
     }
 }
-include("fabric-1.21.10")
-include("fabric-template")
+include(
+        "fabric-1.21.10",
+        "fabric-template",
+
+        "forge-1.21.11",
+        "neoforge-1.21.11",
+
+        "paper",
+        "spigot",
+
+        "quilt-1.21.11"
+)
