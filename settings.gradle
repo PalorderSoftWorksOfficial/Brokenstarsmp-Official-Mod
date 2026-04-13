@@ -4,6 +4,10 @@ pluginManagement {
             name = 'PalorderHosting'
             url = 'https://maven.palorderhosting.net/releases'
         }
+        maven {
+            name = 'FabricMC'
+            url = 'https://maven.fabricmc.net/'
+        }
         gradlePluginPortal()
     }
 }
