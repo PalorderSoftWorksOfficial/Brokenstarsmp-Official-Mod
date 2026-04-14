@@ -9,16 +9,15 @@ buildscript {
 }
 
 plugins {
-    id 'fabric-loom' version "${loom_version}"
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
     id 'maven-publish'
     id 'org.jetbrains.kotlin.jvm' version '2.3.10'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-sourceCompatibility = JavaVersion.VERSION_21
-targetCompatibility = JavaVersion.VERSION_21
-
-archivesBaseName = project.archives_base_name
+base {
+    archivesName = project.archives_base_name
+}
 version = project.mod_version
 group = project.maven_group
 
@@ -111,7 +110,11 @@ tasks.named("remapJar") {
     dependsOn tasks.named("shadowJar")
     inputFile.set(tasks.named("shadowJar").flatMap { it.archiveFile })
 }
-
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 def bumpVersionLogic = { type ->
     if (!["major", "minor", "patch"].contains(type)) {
         throw new GradleException("Unknown version type: $type")
@@ -196,7 +199,7 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             groupId = project.group
-            artifactId = project.archivesBaseName
+            artifactId = archives_base_name
             version = project.version
 
             artifact(tasks.named("remapJar")) {

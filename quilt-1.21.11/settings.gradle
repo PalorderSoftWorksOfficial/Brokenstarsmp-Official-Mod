@@ -32,3 +32,4 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+rootProject.name = 'quilt-1.21.11'

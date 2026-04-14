@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        gradlePluginPortal()
         maven {
             name = 'PalorderHosting'
             url = 'https://maven.palorderhosting.net/releases'
@@ -29,6 +30,5 @@ pluginManagement {
             url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
         }
         mavenCentral()
-        gradlePluginPortal()
     }
 }

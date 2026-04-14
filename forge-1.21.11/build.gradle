@@ -1,7 +1,8 @@
 plugins {
-    id 'net.minecraftforge.gradle' version '6.0.52'
-    id 'maven-publish'
     id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '7.0.20'
 }
 
 group = project.maven_group
@@ -12,19 +13,38 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
 }
 
-repositories {
-    mavenCentral()
-}
+sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 minecraft {
     mappings channel: 'official', version: minecraft_version
 
     runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+            systemProperty 'forge.enabledGameTestNamespaces', project.archives_base_name
+        }
+
         client {}
-        server {}
+        server {
+            args '--nogui'
+        }
+        gameTestServer {}
+        data {
+            workingDir = layout.projectDirectory.dir('run-data')
+            args '--mod', project.archives_base_name, '--all', '--output', layout.projectDirectory.dir('src/generated/resources'), '--existing', layout.projectDirectory.dir('src/main/resources')
+        }
     }
 }
 
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
 dependencies {
-    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.1'
 }

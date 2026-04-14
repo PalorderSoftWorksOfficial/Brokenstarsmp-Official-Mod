@@ -1,16 +1,15 @@
 plugins {
-    id 'fabric-loom'
+    id 'net.fabricmc.fabric-loom-remap' version '1.16-SNAPSHOT'
     id 'maven-publish'
     id 'org.jetbrains.kotlin.jvm' version '2.3.10'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-sourceCompatibility = JavaVersion.VERSION_21
-targetCompatibility = JavaVersion.VERSION_21
-
 group = project.maven_group
 version = project.mod_version
-archivesBaseName = project.archives_base_name
+base {
+    archivesName = project.archives_base_name
+}
 
 repositories {
     mavenCentral()
@@ -75,7 +74,11 @@ processResources {
 loom {
     accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
 }
-
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
 }

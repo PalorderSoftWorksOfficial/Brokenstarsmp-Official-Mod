@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        gradlePluginPortal()
         maven {
             name = 'PalorderHosting'
             url = 'https://maven.palorderhosting.net/releases'
@@ -29,7 +30,6 @@ pluginManagement {
             url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
         }
         mavenCentral()
-        gradlePluginPortal()
     }
 }
 include(
@@ -41,6 +41,5 @@ include(
 
         "paper",
         "spigot",
-
-        "quilt-1.21.11"
 )
+includeBuild("quilt-1.21.11")
