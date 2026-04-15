@@ -36,7 +36,6 @@ include(
         "fabric-1.21.10",
         "fabric-template",
 
-        "forge-1.21.11",
         "neoforge-1.21.11",
 
         "paper",
