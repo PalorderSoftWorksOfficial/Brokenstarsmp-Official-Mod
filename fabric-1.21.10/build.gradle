@@ -47,11 +47,11 @@ dependencies {
 
     modImplementation "net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0"
 
-    modImplementation include("eu.pb4:polymer-core:0.14.4+1.21.10")
-    modImplementation include("eu.pb4:polymer-blocks:0.14.4+1.21.10")
-    modImplementation include("eu.pb4:polymer-resource-pack:0.14.4+1.21.10")
-    modImplementation include("eu.pb4:polymer-virtual-entity:0.14.4+1.21.10")
-    modImplementation include("eu.pb4:polymer-networking:0.14.4+1.21.10")
+    modImplementation include("eu.pb4:polymer-core:0.15.2+")
+    modImplementation include("eu.pb4:polymer-blocks:0.15.2+")
+    modImplementation include("eu.pb4:polymer-resource-pack:0.15.2+")
+    modImplementation include("eu.pb4:polymer-virtual-entity:0.15.2+")
+    modImplementation include("eu.pb4:polymer-networking:0.15.2+")
 
     modLocalRuntime "party.iroiro.luajava:luajit:4.1.0"
     modLocalRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
