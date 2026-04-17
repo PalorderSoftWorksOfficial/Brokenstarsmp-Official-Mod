@@ -196,6 +196,9 @@ public final class OrdersUi {
 
         @Override
         public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
+            if (slot < 0 || slot >= this.slots.size()) {
+                return; // ignore invalid clicks (including -999)
+            }
             if (type == SlotActionType.PICKUP) {
                 if (slot < 45) {
                     int index = page * 45 + slot;
@@ -331,6 +334,9 @@ public final class OrdersUi {
 
         @Override
         public void onSlotClick(int slot, int drag, SlotActionType type, PlayerEntity player) {
+            if (slot < 0 || slot >= this.slots.size()) {
+                return; // ignore invalid clicks (including -999)
+            }
             if (type == SlotActionType.PICKUP) {
                 if (slot == 2) {
                     OrderRequest current = parent.orders.getRequest(request.id);
@@ -464,6 +470,9 @@ public final class OrdersUi {
 
         @Override
         public void onSlotClick(int slot, int drag, SlotActionType type, PlayerEntity player) {
+            if (slot < 0 || slot >= this.slots.size()) {
+                return; // ignore invalid clicks (including -999)
+            }
             if (type == SlotActionType.PICKUP) {
                 if (slot == 2) {
                     OrderRequest removed = parent.orders.removeRequest(request.id);
@@ -575,6 +584,9 @@ public final class OrdersUi {
 
         @Override
         public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
+            if (slot < 0 || slot >= this.slots.size()) {
+                return; // ignore invalid clicks (including -999)
+            }
             if (type == SlotActionType.PICKUP) {
                 if (slot < 45) {
                     Slot s = this.slots.get(slot);

@@ -31,8 +31,8 @@ public final class SellWand {
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
         stack.set(DataComponentTypes.CUSTOM_NAME,
                 Text.literal("")
-                        .append(Text.literal("Sell ").formatted(Formatting.GRAY))
-                        .append(Text.literal("Wand").formatted(Formatting.GOLD))
+                        .append(Text.literal("Sell ").formatted(Formatting.GOLD, Formatting.BOLD, Formatting.ITALIC))
+                        .append(Text.literal("Wand").formatted(Formatting.GOLD, Formatting.BOLD, Formatting.ITALIC))
         );
 
         return stack;

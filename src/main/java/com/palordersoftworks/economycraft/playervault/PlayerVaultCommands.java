@@ -6,7 +6,6 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.palordersoftworks.economycraft.EconomyConfig;
 import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.economycraft.util.FabricPermissionsCompat;
@@ -39,6 +38,17 @@ public final class PlayerVaultCommands {
         return literal(name)
                 .requires(PlayerVaultCommands::mayUse)
                 .executes(ctx -> openPicker(ctx.getSource()))
+                .then(literal("create")
+                        .executes(ctx -> openPicker(ctx.getSource())))
+                .then(literal("rename")
+                        .then(argument("vault", IntegerArgumentType.integer(1))
+                                .suggests(PlayerVaultCommands::suggestVaultNumbers)
+                                .then(argument("name", StringArgumentType.greedyString())
+                                        .executes(ctx -> renameVault(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "vault"),
+                                                StringArgumentType.getString(ctx, "name")
+                                        )))))
                 .then(literal("name")
                         .then(argument("vault", IntegerArgumentType.integer(1))
                                 .suggests(PlayerVaultCommands::suggestVaultNumbers)
@@ -61,7 +71,7 @@ public final class PlayerVaultCommands {
             SuggestionsBuilder builder
     ) {
         if (!(ctx.getSource().getEntity() instanceof ServerPlayerEntity p)) {
-            return Suggestions.empty();
+            return builder.buildFuture();
         }
         var manager = EconomyCraft.getManager(ctx.getSource().getServer());
         int max = resolveMaxVaults(p);
@@ -78,18 +88,8 @@ public final class PlayerVaultCommands {
 
     /** Registers {@code /playervault} and {@code /pv} when standalone commands are enabled. */
     public static void registerStandalone(CommandDispatcher<ServerCommandSource> dispatcher) {
-        LiteralCommandNode<ServerCommandSource> node = dispatcher.register(
-                literal("playervault")
-                        .requires(PlayerVaultCommands::mayUse)
-                        .executes(ctx -> openPicker(ctx.getSource()))
-                        .then(argument("vault", IntegerArgumentType.integer(1))
-                                .suggests(PlayerVaultCommands::suggestVaultNumbers)
-                                .executes(ctx -> openVault(
-                                        ctx.getSource(),
-                                        IntegerArgumentType.getInteger(ctx, "vault")
-                                )))
-        );
-        dispatcher.register(literal("pv").requires(PlayerVaultCommands::mayUse).redirect(node));
+        dispatcher.register(playervaultBranch("playervault"));
+        dispatcher.register(playervaultBranch("pv"));
     }
 
     public static boolean mayUse(ServerCommandSource source) {
