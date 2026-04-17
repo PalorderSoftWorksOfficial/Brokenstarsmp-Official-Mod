@@ -33,7 +33,7 @@ dependencies {
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.4"
     annotationProcessor "io.github.llamalad7:mixinextras-common:0.5.4"
 
-    modImplementation include("eu.pb4:polymer-core:0.15.2+1.21.11")
+    modImplementation include("eu.pb4:polymer-core:0.15.2+")
 
     modLocalRuntime "party.iroiro.luajava:luajit:4.1.0"
     luaShadow "party.iroiro.luajava:luajit:4.1.0"
