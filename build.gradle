@@ -60,7 +60,7 @@ dependencies {
     implementation "cc.tweaked:cc-tweaked-1.21.11-fabric:1.117.1"
     implementation "cc.tweaked:cc-tweaked-1.21.11-fabric-api:1.117.1"
 
-    modImplementation "net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0"
+    modImplementation "net.fabricmc:fabric-language-kotlin:1.13.9+"
     // Polymer dependencies
     modImplementation include("eu.pb4:polymer-core:0.15.2+1.21.11")
     modImplementation include("eu.pb4:polymer-blocks:0.15.2+1.21.11")
