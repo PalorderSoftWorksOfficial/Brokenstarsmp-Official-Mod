@@ -20,6 +20,5 @@
   "suggests": {
     "luckperms": "*",
     "fabric-permissions-api-v0": "*"
-  },
-  "accessWidener": "brokenstarsmp.accesswidener"
+  }
 }
