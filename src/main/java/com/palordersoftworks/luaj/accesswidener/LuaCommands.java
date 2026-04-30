@@ -1,6 +1,7 @@
 package com.palordersoftworks.luaj.accesswidener;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.palordersoftworks.economycraft.util.PermissionCompat;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -19,7 +20,7 @@ public final class LuaCommands {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(CommandManager.literal("lua")
-                    .requires(CommandManager.requirePermissionLevel(CommandManager.GAMEMASTERS_CHECK))
+                    .requires(source -> PermissionCompat.gamemaster().test(source))
                     .then(CommandManager.literal("reload").executes(ctx -> {
                         LUA.reloadAll();
                         return 1;

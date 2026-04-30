@@ -12,14 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -47,11 +40,13 @@ public final class LuaScriptManager {
         this.poolSize = Math.max(1, poolSize);
         this.memoryLimitMb = Math.max(64, memoryLimitMb);
         this.timeout = timeout == null ? DEFAULT_TIMEOUT : timeout;
+
         try {
             Files.createDirectories(root);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
         warmPool();
     }
 
@@ -62,6 +57,7 @@ public final class LuaScriptManager {
     public List<String> reloadAll() {
         stopAll();
         warmPool();
+
         List<String> loaded = new ArrayList<>();
         for (Path file : scanFiles()) {
             String name = scriptName(file);
@@ -73,7 +69,7 @@ public final class LuaScriptManager {
     }
 
     public boolean load(String name) {
-        return load(name, null);
+        return load(name, (ScriptHost) null);
     }
 
     public boolean load(String name, ScriptHost host) {
@@ -81,9 +77,9 @@ public final class LuaScriptManager {
         if (file == null) {
             return false;
         }
-        scripts.put(name, new ScriptHandle(name, file, host));
-        return true;
+        return load(name, file, host);
     }
+
     private boolean load(String name, Path file, ScriptHost host) {
         if (!isSafeName(name)) {
             return false;
@@ -92,8 +88,9 @@ public final class LuaScriptManager {
         scripts.put(name, handle);
         return true;
     }
+
     public boolean run(String name) {
-        return run(name, null);
+        return run(name, (ScriptHost) null);
     }
 
     public boolean run(String name, ScriptHost host) {
@@ -117,7 +114,7 @@ public final class LuaScriptManager {
     }
 
     public boolean runCode(String code) {
-        return runCode(code, null);
+        return runCode(code, (ScriptHost) null);
     }
 
     public boolean runCode(String code, ScriptHost host) {
@@ -160,23 +157,17 @@ public final class LuaScriptManager {
 
     private boolean executeSandboxed(String scriptName, ScriptHost host, String code) {
         SandboxProcess worker = borrowWorker();
+        boolean returnToPool = false;
+
         try {
             SandboxProcess.ExecutionResult result = worker.execute(code, timeout);
 
             if (result.suspicious()) {
                 String message = "malware alert in script '" + scriptName + "': " + result.error();
                 malwareAlertSink.accept(message);
-                if (host != null) {
-                    host.error(message);
-                    if (result.output() != null && !result.output().isBlank()) {
-                        host.error(result.output());
-                    }
-                } else {
-                    System.err.println(message);
-                    if (result.output() != null && !result.output().isBlank()) {
-                        System.err.println(result.output());
-                    }
-                }
+                emitError(host, message);
+                emitOutput(host, result.output());
+                returnToPool = worker.isAlive();
                 return false;
             }
 
@@ -185,33 +176,46 @@ public final class LuaScriptManager {
                 if (text == null || text.isBlank()) {
                     text = result.error() == null ? "script failed" : result.error();
                 }
-                if (host != null) {
-                    host.error(text);
-                } else {
-                    System.err.println(text);
-                }
+                emitError(host, text);
+                returnToPool = worker.isAlive() && !result.timeout();
                 return false;
             }
 
-            if (result.output() != null && !result.output().isBlank()) {
-                System.out.print(result.output());
-            }
-
+            emitOutput(host, result.output());
+            returnToPool = worker.isAlive() && !result.timeout();
             return true;
         } catch (Exception e) {
-            String text = stackTrace(e);
-            if (host != null) {
-                host.error(text);
-            } else {
-                System.err.println(text);
-            }
+            emitError(host, stackTrace(e));
+            returnToPool = false;
             return false;
         } finally {
-            try {
-                worker.close();
-            } catch (Exception ignored) {
+            if (returnToPool) {
+                returnWorker(worker);
+            } else {
+                discardWorker(worker);
             }
-            replenishPool();
+        }
+    }
+
+    private void emitOutput(@Nullable ScriptHost host, String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        if (host != null) {
+            host.print(text);
+        } else {
+            System.out.print(text);
+        }
+    }
+
+    private void emitError(@Nullable ScriptHost host, String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        if (host != null) {
+            host.error(text);
+        } else {
+            System.err.println(text);
         }
     }
 
@@ -222,11 +226,39 @@ public final class LuaScriptManager {
                 return worker;
             }
         }
+
         try {
             return SandboxProcess.start(memoryLimitMb);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void returnWorker(SandboxProcess worker) {
+        if (worker == null) {
+            return;
+        }
+        synchronized (poolLock) {
+            if (idleWorkers.size() >= poolSize || !worker.isAlive()) {
+                try {
+                    worker.close();
+                } catch (Exception ignored) {
+                }
+                return;
+            }
+            idleWorkers.addLast(worker);
+        }
+    }
+
+    private void discardWorker(SandboxProcess worker) {
+        if (worker == null) {
+            return;
+        }
+        try {
+            worker.close();
+        } catch (Exception ignored) {
+        }
+        replenishPool();
     }
 
     private void replenishPool() {

@@ -1,40 +1,51 @@
 package com.palordersoftworks.luaj.sandboxing;
 
-import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class SandboxProcess implements AutoCloseable {
-    public record ExecutionResult(boolean success, boolean suspicious, boolean timeout, int exitCode, String output, String error) {
+    public record ExecutionResult(
+            boolean success,
+            boolean suspicious,
+            boolean timeout,
+            int exitCode,
+            String output,
+            String error
+    ) {
     }
 
-    private static final int OUTPUT_LIMIT_BYTES = 1024 * 1024;
+    private static final int LIMIT_BYTES = 1024 * 1024;
 
     private final Process process;
-    private final BufferedWriter writer;
-    private final ByteArrayOutputStream captured = new ByteArrayOutputStream();
-    private final Thread pumpThread;
+    private final DataInputStream in;
+    private final DataOutputStream out;
+    private final ByteArrayOutputStream stderrCaptured = new ByteArrayOutputStream();
+    private final Thread stderrPump;
     private volatile boolean closed;
-    private volatile boolean executed;
 
     private SandboxProcess(Process process) {
         this.process = process;
-        this.writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
-        this.pumpThread = new Thread(this::pumpOutput, "lua-sandbox-stdout");
-        this.pumpThread.setDaemon(true);
-        this.pumpThread.start();
+        this.in = new DataInputStream(new BufferedInputStream(process.getInputStream()));
+        this.out = new DataOutputStream(new BufferedOutputStream(process.getOutputStream()));
+
+        this.stderrPump = new Thread(this::pumpStderr, "lua-sandbox-stderr");
+        this.stderrPump.setDaemon(true);
+        this.stderrPump.start();
     }
 
     public static SandboxProcess start(long memoryMb) throws IOException {
         String javaExe = javaExecutable();
+
         List<String> command = new ArrayList<>();
         command.add(javaExe);
         command.add("-Xmx" + memoryMb + "m");
@@ -47,38 +58,75 @@ public final class SandboxProcess implements AutoCloseable {
         command.add("com.palordersoftworks.luaj.sandboxing.SandboxWorker");
 
         ProcessBuilder pb = new ProcessBuilder(command);
-        pb.redirectErrorStream(true);
-        pb.environment().clear();
+        pb.redirectErrorStream(false);
         return new SandboxProcess(pb.start());
     }
 
+    public synchronized boolean isAlive() {
+        return !closed && process.isAlive();
+    }
+
     public synchronized ExecutionResult execute(String code, Duration timeout) throws Exception {
-        if (executed) {
-            throw new IllegalStateException("sandbox process already used");
+        if (closed) {
+            throw new IllegalStateException("sandbox process is closed");
         }
-        executed = true;
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("timeout must be positive");
+        }
 
-        writer.write(code);
-        writer.write('\n');
-        writer.flush();
-        writer.close();
+        if (!process.isAlive()) {
+            return new ExecutionResult(
+                    false,
+                    false,
+                    false,
+                    exitCodeOrMinusOne(),
+                    "",
+                    diagnosticsOr("sandbox worker already exited")
+            );
+        }
 
-        boolean finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
-        if (!finished) {
+        byte[] payload = code == null ? new byte[0] : code.getBytes(StandardCharsets.UTF_8);
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "lua-sandbox-timeout");
+            t.setDaemon(true);
+            return t;
+        });
+
+        AtomicBoolean timedOut = new AtomicBoolean(false);
+        ScheduledFuture<?> killer = scheduler.schedule(() -> {
+            timedOut.set(true);
             destroyForcibly();
-            joinPump();
-            return new ExecutionResult(false, false, true, -1, output(), "timeout");
+        }, timeout.toMillis(), TimeUnit.MILLISECONDS);
+
+        try {
+            out.writeInt(payload.length);
+            out.write(payload);
+            out.flush();
+
+            boolean success = in.readBoolean();
+            boolean suspicious = in.readBoolean();
+            boolean timeoutFlag = in.readBoolean();
+            int exitCode = in.readInt();
+            String output = readString(in);
+            String error = readString(in);
+
+            return new ExecutionResult(success, suspicious, timeoutFlag, exitCode, output, error);
+        } catch (EOFException eof) {
+            if (timedOut.get()) {
+                return new ExecutionResult(false, false, true, -1, "", "timeout");
+            }
+            return new ExecutionResult(false, false, false, exitCodeOrMinusOne(), "", diagnosticsOr("sandbox worker terminated unexpectedly"));
+        } catch (IOException io) {
+            if (timedOut.get()) {
+                return new ExecutionResult(false, false, true, -1, "", "timeout");
+            }
+            return new ExecutionResult(false, false, false, exitCodeOrMinusOne(), "", diagnosticsOr("I/O failure: " + io.getMessage()));
+        } finally {
+            killer.cancel(false);
+            scheduler.shutdownNow();
         }
-
-        joinPump();
-
-        int exit = process.exitValue();
-        String out = output();
-        boolean suspicious = exit == 42;
-        boolean success = exit == 0;
-        String error = success ? null : (suspicious ? "suspicious behavior detected" : "exit code " + exit);
-
-        return new ExecutionResult(success, suspicious, false, exit, out, error);
     }
 
     @Override
@@ -86,20 +134,18 @@ public final class SandboxProcess implements AutoCloseable {
         if (closed) {
             return;
         }
-        closed = true;
         destroyForcibly();
-        joinPump();
     }
 
-    private void pumpOutput() {
-        try (InputStream in = process.getInputStream()) {
+    private void pumpStderr() {
+        try (InputStream err = process.getErrorStream()) {
             byte[] buffer = new byte[8192];
-            int read;
             int total = 0;
-            while ((read = in.read(buffer)) != -1) {
-                if (total < OUTPUT_LIMIT_BYTES) {
-                    int allowed = Math.min(read, OUTPUT_LIMIT_BYTES - total);
-                    captured.write(buffer, 0, allowed);
+            int read;
+            while ((read = err.read(buffer)) != -1) {
+                if (total < LIMIT_BYTES) {
+                    int allowed = Math.min(read, LIMIT_BYTES - total);
+                    stderrCaptured.write(buffer, 0, allowed);
                     total += allowed;
                 }
             }
@@ -107,15 +153,42 @@ public final class SandboxProcess implements AutoCloseable {
         }
     }
 
-    private String output() {
-        return new String(captured.toByteArray(), StandardCharsets.UTF_8);
+    private String diagnosticsOr(String fallback) {
+        String diag = stderrOutput();
+        if (diag.isBlank()) {
+            return fallback;
+        }
+        return fallback + ": " + diag;
+    }
+
+    private String stderrOutput() {
+        return new String(stderrCaptured.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    private int exitCodeOrMinusOne() {
+        try {
+            return process.exitValue();
+        } catch (IllegalThreadStateException ignored) {
+            return -1;
+        }
     }
 
     private void destroyForcibly() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+
         try {
-            writer.close();
+            out.close();
         } catch (Exception ignored) {
         }
+
+        try {
+            in.close();
+        } catch (Exception ignored) {
+        }
+
         if (process.isAlive()) {
             process.destroy();
             try {
@@ -127,14 +200,32 @@ public final class SandboxProcess implements AutoCloseable {
                 Thread.currentThread().interrupt();
             }
         }
+
+        joinPump();
     }
 
     private void joinPump() {
         try {
-            pumpThread.join(1000);
+            stderrPump.join(1000);
         } catch (InterruptedException ignored) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static String readString(DataInputStream in) throws IOException {
+        int len = in.readInt();
+        if (len < 0) {
+            throw new IOException("negative string length");
+        }
+        if (len == 0) {
+            return "";
+        }
+
+        byte[] bytes = in.readNBytes(len);
+        if (bytes.length != len) {
+            throw new EOFException("truncated string");
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     private static String javaExecutable() {
