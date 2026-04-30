@@ -1,50 +1,47 @@
 accessWidener v2 named
 
- accessible class net/minecraft/server/level/ChunkMap$TrackedEntity
- accessible class net/minecraft/server/level/ServerChunkCache$MainThreadExecutor
- accessible class net/minecraft/server/level/ServerLevel$EntityCallbacks
- accessible class net/minecraft/world/level/border/WorldBorder$BorderExtent
- accessible class net/minecraft/world/level/chunk/PaletteResize
- accessible class net/minecraft/world/level/chunk/Configuration
- accessible class net/minecraft/world/level/chunk/PalettedContainer$Data
- accessible class net/minecraft/world/level/material/FlowingFluid$BlockStatePairKey
- accessible class net/minecraft/world/phys/shapes/IndexMerger
- accessible class net/minecraft/world/level/chunk/LevelChunk$RebindableTickingBlockEntityWrapper
- accessible class net/minecraft/world/entity/ai/behavior/AcquirePoi$JitteredLinearRetry
-
- accessible class net/minecraft/block/CrafterBlock
-
- accessible field net/minecraft/util/Mth SIN [F
- accessible field net/minecraft/world/phys/shapes/VoxelShape shape Lnet/minecraft/world/phys/shapes/DiscreteVoxelShape;
- accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server/level/ServerLevel;
- accessible field net/minecraft/world/level/chunk/Strategy LINEAR_PALETTE_FACTORY Lnet/minecraft/world/level/chunk/Palette$Factory;
- accessible field net/minecraft/world/level/chunk/Strategy SINGLE_VALUE_PALETTE_FACTORY Lnet/minecraft/world/level/chunk/Palette$Factory;
- accessible field net/minecraft/block/CrafterBlock CRAFTING Lnet/minecraft/state/property/BooleanProperty;
- accessible field net/minecraft/block/CrafterBlock TRIGGERED Lnet/minecraft/state/property/BooleanProperty;
- accessible field net/minecraft/block/CrafterBlock ORIENTATION Lnet/minecraft/state/property/EnumProperty;
- accessible field net/minecraft/block/CrafterBlock RECIPE_CACHE Lnet/minecraft/recipe/RecipeCache;
-
- accessible method net/minecraft/nbt/CompoundTag <init> (Ljava/util/Map;)V
- accessible method net/minecraft/util/SortedArraySet <init> (ILjava/util/Comparator;)V
- accessible method net/minecraft/world/entity/ai/village/poi/PoiSection isValid ()Z
- accessible method net/minecraft/world/entity/ai/village/poi/PoiRecord acquireTicket ()Z
- accessible method net/minecraft/world/level/material/Fluid isEmpty ()Z
- accessible method net/minecraft/world/level/pathfinder/WalkNodeEvaluator getPathTypeFromState (Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/pathfinder/PathType;
- accessible method net/minecraft/world/level/redstone/RedstoneWireEvaluator getWireSignal (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I
- accessible method net/minecraft/world/level/redstone/ExperimentalRedstoneWireEvaluator getWireSignal (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I
- accessible method net/minecraft/world/phys/shapes/Shapes findBits (DD)I
- accessible method net/minecraft/world/level/chunk/storage/SectionStorage getOrLoad (J)Ljava/util/Optional;
- accessible method net/minecraft/block/CrafterBlock appendProperties (Lnet/minecraft/state/StateManager$Builder;)V
- accessible method net/minecraft/block/CrafterBlock craft (Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;)V
- accessible method net/minecraft/block/CrafterBlock createBlockEntity (Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)Lnet/minecraft/block/entity/BlockEntity;
- accessible method net/minecraft/block/CrafterBlock getCodec ()Lcom/mojang/serialization/MapCodec;
- accessible method net/minecraft/block/CrafterBlock getComparatorOutput (Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/math/Direction;)I
- accessible method net/minecraft/block/CrafterBlock getCraftingRecipe (Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/recipe/input/CraftingRecipeInput;)Ljava/util/Optional;
- accessible method net/minecraft/block/CrafterBlock neighborUpdate (Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/Block;Lnet/minecraft/world/block/WireOrientation;Z)V
- accessible method net/minecraft/block/CrafterBlock onPlaced (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;)V
- accessible method net/minecraft/block/CrafterBlock onStateReplaced (Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Z)V
- accessible method net/minecraft/block/CrafterBlock onUse (Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/entity/player/PlayerEntity;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;
- accessible method net/minecraft/block/CrafterBlock rotate (Lnet/minecraft/block/BlockState;Lnet/minecraft/util/BlockRotation;)Lnet/minecraft/block/BlockState;
- accessible method net/minecraft/block/CrafterBlock scheduledTick (Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/math/random/Random;)V
- accessible method net/minecraft/block/CrafterBlock setTriggered (Lnet/minecraft/block/entity/BlockEntity;Z)V
- accessible method net/minecraft/block/CrafterBlock transferOrSpawnStack (Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/entity/CrafterBlockEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/block/BlockState;Lnet/minecraft/recipe/RecipeEntry;)V
+accessible class net/minecraft/server/level/ChunkMap$TrackedEntity
+accessible class net/minecraft/server/level/ServerChunkCache$MainThreadExecutor
+accessible class net/minecraft/server/level/ServerLevel$EntityCallbacks
+accessible class net/minecraft/world/level/border/WorldBorder$BorderExtent
+accessible class net/minecraft/world/level/chunk/PaletteResize
+accessible class net/minecraft/world/level/chunk/Configuration
+accessible class net/minecraft/world/level/chunk/PalettedContainer$Data
+accessible class net/minecraft/world/level/material/FlowingFluid$BlockStatePairKey
+accessible class net/minecraft/world/phys/shapes/IndexMerger
+accessible class net/minecraft/world/level/chunk/LevelChunk$RebindableTickingBlockEntityWrapper
+accessible class net/minecraft/world/entity/ai/behavior/AcquirePoi$JitteredLinearRetry
+accessible class net/minecraft/block/CrafterBlock
+accessible field net/minecraft/util/Mth SIN [F
+accessible field net/minecraft/world/phys/shapes/VoxelShape shape Lnet/minecraft/world/phys/shapes/DiscreteVoxelShape;
+accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server/level/ServerLevel;
+accessible field net/minecraft/world/level/chunk/Strategy LINEAR_PALETTE_FACTORY Lnet/minecraft/world/level/chunk/Palette$Factory;
+accessible field net/minecraft/world/level/chunk/Strategy SINGLE_VALUE_PALETTE_FACTORY Lnet/minecraft/world/level/chunk/Palette$Factory;
+accessible field net/minecraft/block/CrafterBlock CRAFTING Lnet/minecraft/state/property/BooleanProperty;
+accessible field net/minecraft/block/CrafterBlock TRIGGERED Lnet/minecraft/state/property/BooleanProperty;
+accessible field net/minecraft/block/CrafterBlock ORIENTATION Lnet/minecraft/state/property/EnumProperty;
+accessible field net/minecraft/block/CrafterBlock RECIPE_CACHE Lnet/minecraft/recipe/RecipeCache;
+accessible method net/minecraft/nbt/CompoundTag <init> (Ljava/util/Map;)V
+accessible method net/minecraft/util/SortedArraySet <init> (ILjava/util/Comparator;)V
+accessible method net/minecraft/world/entity/ai/village/poi/PoiSection isValid ()Z
+accessible method net/minecraft/world/entity/ai/village/poi/PoiRecord acquireTicket ()Z
+accessible method net/minecraft/world/level/material/Fluid isEmpty ()Z
+accessible method net/minecraft/world/level/pathfinder/WalkNodeEvaluator getPathTypeFromState (Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/pathfinder/PathType;
+accessible method net/minecraft/world/level/redstone/RedstoneWireEvaluator getWireSignal (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I
+accessible method net/minecraft/world/level/redstone/ExperimentalRedstoneWireEvaluator getWireSignal (Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I
+accessible method net/minecraft/world/phys/shapes/Shapes findBits (DD)I
+accessible method net/minecraft/world/level/chunk/storage/SectionStorage getOrLoad (J)Ljava/util/Optional;
+accessible method net/minecraft/block/CrafterBlock appendProperties (Lnet/minecraft/state/StateManager$Builder;)V
+accessible method net/minecraft/block/CrafterBlock craft (Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;)V
+accessible method net/minecraft/block/CrafterBlock createBlockEntity (Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)Lnet/minecraft/block/entity/BlockEntity;
+accessible method net/minecraft/block/CrafterBlock getCodec ()Lcom/mojang/serialization/MapCodec;
+accessible method net/minecraft/block/CrafterBlock getComparatorOutput (Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/math/Direction;)I
+accessible method net/minecraft/block/CrafterBlock getCraftingRecipe (Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/recipe/input/CraftingRecipeInput;)Ljava/util/Optional;
+accessible method net/minecraft/block/CrafterBlock neighborUpdate (Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/Block;Lnet/minecraft/world/block/WireOrientation;Z)V
+accessible method net/minecraft/block/CrafterBlock onPlaced (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;)V
+accessible method net/minecraft/block/CrafterBlock onStateReplaced (Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Z)V
+accessible method net/minecraft/block/CrafterBlock onUse (Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/entity/player/PlayerEntity;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;
+accessible method net/minecraft/block/CrafterBlock rotate (Lnet/minecraft/block/BlockState;Lnet/minecraft/util/BlockRotation;)Lnet/minecraft/block/BlockState;
+accessible method net/minecraft/block/CrafterBlock scheduledTick (Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/math/random/Random;)V
+accessible method net/minecraft/block/CrafterBlock setTriggered (Lnet/minecraft/block/entity/BlockEntity;Z)V
+accessible method net/minecraft/block/CrafterBlock transferOrSpawnStack (Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/entity/CrafterBlockEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/block/BlockState;Lnet/minecraft/recipe/RecipeEntry;)V
