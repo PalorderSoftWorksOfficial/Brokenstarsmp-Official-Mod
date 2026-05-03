@@ -70,6 +70,9 @@ processResources {
         expand "version": project.version
     }
 }
+loom {
+    accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
+}
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)

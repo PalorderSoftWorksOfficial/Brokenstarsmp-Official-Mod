@@ -39,10 +39,6 @@ dependencies {
     luaShadow "party.iroiro.luajava:luajit:4.1.0"
 }
 
-loom {
-    accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
-}
-
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
 }

@@ -10,7 +10,6 @@
     "ChestBlock_Mixin",
     "CrafterBlock_Mixin",
     "DropperBlock_Mixin",
-    "EnderchestCommand_Mixin",
     "ExperienceOrbEntity_Mixin",
     "ExperienceOrbEntity_NoSplitMixin",
     "FireBlock_Mixin",
