@@ -1,0 +1,21 @@
+name: Start Services
+
+on:
+  workflow_dispatch:
+
+jobs:
+  start-services:
+    runs-on: self-hosted
+
+    steps:
+      - name: Start Apache and SSH
+        env:
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
+        run: |
+          echo "$SUDO_PASSWORD" | sudo -S systemctl start apache2
+          echo "$SUDO_PASSWORD" | sudo -S systemctl start sshd
+
+      - name: Verify services
+        run: |
+          systemctl status apache2 --no-pager
+          systemctl status sshd --no-pager
