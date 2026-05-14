@@ -1,8 +1,9 @@
 package com.palordersoftworks.brokenstarsmpmod.initiaters;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeCommands;
+import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeController;
 import com.palordersoftworks.brokenstarsmpmod.fluid.CobbleOreQueue;
 import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.economycraft.wand.SellWand;
@@ -12,15 +13,14 @@ import com.palordersoftworks.luaj.accesswidener.LuaScriptManager;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
@@ -37,6 +37,15 @@ public class DropAtFeet implements ModInitializer {
         });
         ConfigManager.registerAnnotatedConfigs(ServerRules.class);
         ConfigManager.registerCommands();
+        TranslationProbeCommands.register();
+
+        ServerLifecycleEvents.SERVER_STARTED.register(TranslationProbeController::init);
+        ServerLifecycleEvents.SERVER_STOPPING.register(TranslationProbeController::onServerStopping);
+        ServerTickEvents.END_SERVER_TICK.register(TranslationProbeController::tick);
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+                TranslationProbeController.onPlayerJoin(handler.player, server));
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
+                TranslationProbeController.clearPlayer(handler.player.getUuid(), server));
         final LuaScriptManager LUA = new LuaScriptManager();
         // Drop‑at‑feet logic
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {

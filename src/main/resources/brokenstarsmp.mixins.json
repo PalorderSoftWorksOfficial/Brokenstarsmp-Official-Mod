@@ -26,6 +26,7 @@
     "MobEntity_TargetMixin",
     "ProjectileEntity_LifetimeMixin",
     "ServerPlayerEntity_Mixin",
+    "ServerPlayNetworkHandler_TranslationProbeMixin",
     "ServerWorld_EntityProcessingLimit_Mixin"
   ],
   "client": [

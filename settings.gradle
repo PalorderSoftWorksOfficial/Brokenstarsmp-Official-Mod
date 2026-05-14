@@ -33,7 +33,6 @@ pluginManagement {
     }
 }
 include(
-        "fabric-1.21.10",
         "fabric-template",
 
         "paper",
