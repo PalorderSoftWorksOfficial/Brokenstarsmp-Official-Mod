@@ -46,7 +46,7 @@ public final class TranslationProbeStorage {
             if (parsed.hacks == null || parsed.hacks.isEmpty()) {
                 parsed.mergeMissingHacksFrom(CheckHacksConfig.createDefaultRegistry());
             }
-            parsed.normalizeHackIds();
+            parsed.normalizeAfterLoad();
             return parsed;
         } catch (Exception e) {
             LOGGER.error("[BrokenStarSMP/CheckHacks] Failed to load config; using in-memory defaults.", e);

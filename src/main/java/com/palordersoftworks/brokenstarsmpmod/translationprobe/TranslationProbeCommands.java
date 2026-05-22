@@ -84,18 +84,22 @@ public final class TranslationProbeCommands {
                                     .executes(ctx -> {
                                         var cfg = TranslationProbeController.getFileConfig();
                                         int g = cfg.defaultCheckHacks == null ? 0 : cfg.defaultCheckHacks.size();
+                                        int j = cfg.autoCheckOnJoin == null || cfg.autoCheckOnJoin.hacks == null
+                                                ? 0 : cfg.autoCheckOnJoin.hacks.size();
                                         int h = cfg.hacks == null ? 0 : cfg.hacks.size();
+                                        boolean joinOn = cfg.autoCheckOnJoin != null && cfg.autoCheckOnJoin.enabled;
                                         ctx.getSource().sendFeedback(
                                                 () -> Text.literal(String.format(
-                                                        "[CheckHacks] runtime=%s file.enabled=%s autoJoin=%s detectFlag=%s group=%d registry=%d timeout=%d between=%d",
+                                                        "[CheckHacks] runtime=%s file.enabled=%s autoJoin=%s joinHacks=%d default=%d registry=%d timeout=%d between=%d bedrock=%s",
                                                         TranslationProbeController.isRuntimeEnabled(),
                                                         cfg.enabled,
-                                                        cfg.autoCheckOnJoin,
-                                                        cfg.detectFlag,
+                                                        joinOn,
+                                                        j,
                                                         g,
                                                         h,
                                                         cfg.timeoutTicks,
-                                                        cfg.betweenSignTicks
+                                                        cfg.betweenSignTicks,
+                                                        cfg.bedrock != null && cfg.bedrock.enabled
                                                 )).formatted(Formatting.AQUA),
                                                 false
                                         );
