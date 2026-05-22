@@ -1,64 +1,68 @@
 package com.palordersoftworks.brokenstarsmpmod.translationprobe;
 
-import net.minecraft.text.Text;
-
 import java.util.Locale;
 
 /**
- * Classifies client-submitted sign text for {@link HackProbeMode}.
+ * Classifies client-submitted sign lines using CheckHacks {@code evaluateResponse} rules.
  */
 public final class HackProbeClassifier {
+    public static final String CONTROL_KEYBIND = "key.forward";
+
     private HackProbeClassifier() {}
 
-    /**
-     * @param line          trimmed line from the configured sign row (index 0)
-     * @param expectedKey   translation / keybind key
-     * @param mode          strategy
-     * @param displayName   registry display name (for TRANSLATE)
-     */
-    public static HackProbeResultState classifyLine(String line, String expectedKey, HackProbeMode mode, String displayName) {
-        String t = line == null ? "" : line.trim();
-        if (t.isEmpty()) {
-            return HackProbeResultState.PROTECTED;
+    public static boolean isExploitPreventer(String controlLine) {
+        if (controlLine == null) {
+            return false;
         }
-        String key = expectedKey == null ? "" : expectedKey.trim();
-        String resolved = Text.translatable(key).getString().trim();
+        return controlLine.strip().equalsIgnoreCase(CONTROL_KEYBIND);
+    }
 
-        if (matchesKeybindStrict(t, key, resolved)) {
-            return HackProbeResultState.CLEAN;
+    public static HackProbeResultState evaluate(String responseLine, HackRegistryEntry hack, boolean exploitPreventer) {
+        if (hack == null) {
+            return HackProbeResultState.SKIPPED;
+        }
+        String resp = responseLine == null ? "" : responseLine.strip();
+        if (resp.isEmpty()) {
+            return HackProbeResultState.NOT_DETECTED;
         }
 
-        return switch (mode) {
-            case METEOR -> classifyMeteor(t, key, resolved);
-            case KEYBIND -> HackProbeResultState.FLAGGED;
-            case TRANSLATE -> classifyTranslate(t, key, resolved, displayName);
+        String key = hack.key == null ? "" : hack.key.strip();
+        String fallback = hack.fallback();
+
+        return switch (hack.mode) {
+            case METEOR -> evaluateMeteor(resp, key, fallback);
+            case TRANSLATE -> evaluateTranslate(resp, key, fallback);
+            case KEYBIND -> evaluateKeybind(resp, key, exploitPreventer);
         };
     }
 
-    private static HackProbeResultState classifyMeteor(String line, String key, String resolved) {
-        if (matchesKeybindStrict(line, key, resolved)) {
-            return HackProbeResultState.CLEAN;
+    private static HackProbeResultState evaluateMeteor(String resp, String key, String fallback) {
+        if (resp.equalsIgnoreCase(key)) {
+            return HackProbeResultState.DETECTED;
         }
-        String rl = resolved.toLowerCase(Locale.ROOT);
-        String ll = line.toLowerCase(Locale.ROOT);
-        if (rl.contains("meteor") && ll.contains("meteor")) {
-            return HackProbeResultState.CLEAN;
+        if (resp.toLowerCase(Locale.ROOT).startsWith(fallback.toLowerCase(Locale.ROOT))) {
+            return HackProbeResultState.NOT_DETECTED;
         }
-        return HackProbeResultState.FLAGGED;
+        return HackProbeResultState.DETECTED;
     }
 
-    private static HackProbeResultState classifyTranslate(String line, String key, String resolved, String displayName) {
-        if (matchesKeybindStrict(line, key, resolved)) {
-            return HackProbeResultState.CLEAN;
+    private static HackProbeResultState evaluateTranslate(String resp, String key, String fallback) {
+        if (resp.toLowerCase(Locale.ROOT).startsWith(fallback.toLowerCase(Locale.ROOT))) {
+            return HackProbeResultState.NOT_DETECTED;
         }
-        if (displayName != null && !displayName.isBlank() && line.trim().equalsIgnoreCase(displayName.trim())) {
-            return HackProbeResultState.CLEAN;
+        if (resp.equalsIgnoreCase(key)) {
+            return HackProbeResultState.PROTECTED;
         }
-        return HackProbeResultState.FLAGGED;
+        return HackProbeResultState.DETECTED;
     }
 
-    private static boolean matchesKeybindStrict(String line, String key, String resolved) {
-        String t = line.trim();
-        return t.equals(key) || t.equals(resolved);
+    private static HackProbeResultState evaluateKeybind(String resp, String key, boolean exploitPreventer) {
+        if (exploitPreventer && resp.equalsIgnoreCase(key)) {
+            return HackProbeResultState.PROTECTED;
+        }
+        if (resp.equalsIgnoreCase(key)) {
+            return HackProbeResultState.NOT_DETECTED;
+        }
+        return HackProbeResultState.DETECTED;
     }
 }
