@@ -277,26 +277,18 @@ public final class TranslationProbeController {
             return;
         }
 
-        BlockPos pos = findPlacement(player, world);
-        if (pos == null) {
-            LOGGER.warn("[BrokenStarSMP/CheckHacks] no sign space player={} hack={}",
-                    player.getName().getString(), hackId);
-            run.resumeAtTick = server.getTicks() + 20;
-            return;
-        }
-
+        // Always one block above the player.
+        BlockPos pos = player.getBlockPos().up();
         BlockState previous = world.getBlockState(pos);
 
         float yaw = MathHelper.wrapDegrees(player.getYaw());
         int rotation = (int) Math.floor((yaw + 180.0F) * 16.0F / 360.0F) & 15;
-
         BlockState signState = Blocks.OAK_SIGN.getDefaultState().with(Properties.ROTATION, rotation);
 
-        if (!signState.canPlaceAt(world, pos) || !world.setBlockState(pos, signState, 3)) {
+        // Force the probe block into place, replacing whatever was there.
+        if (!world.setBlockState(pos, signState, 3)) {
             LOGGER.warn("[BrokenStarSMP/CheckHacks] sign place failed player={} hack={}",
                     player.getName().getString(), hackId);
-
-            world.setBlockState(pos, previous, 3);
             run.resumeAtTick = server.getTicks() + 20;
             return;
         }
