@@ -263,6 +263,7 @@ public final class TranslationProbeController {
             RUNS.remove(player.getUuid());
             return;
         }
+
         String hackId = run.queue.get(run.index);
         HackRegistryEntry entry = fileConfig.getHack(hackId);
         if (entry == null) {
@@ -270,33 +271,50 @@ public final class TranslationProbeController {
             scheduleNextHack(server, player, run, 0);
             return;
         }
+
         if (!(player.getEntityWorld() instanceof ServerWorld world)) {
             RUNS.remove(player.getUuid());
             return;
         }
+
         BlockPos pos = findPlacement(player, world);
         if (pos == null) {
-            LOGGER.warn("[BrokenStarSMP/CheckHacks] no sign space player={} hack={}", player.getName().getString(), hackId);
-            RUNS.remove(player.getUuid());
+            LOGGER.warn("[BrokenStarSMP/CheckHacks] no sign space player={} hack={}",
+                    player.getName().getString(), hackId);
+            run.resumeAtTick = server.getTicks() + 20;
             return;
         }
+
         BlockState previous = world.getBlockState(pos);
+
         float yaw = MathHelper.wrapDegrees(player.getYaw());
         int rotation = (int) Math.floor((yaw + 180.0F) * 16.0F / 360.0F) & 15;
+
         BlockState signState = Blocks.OAK_SIGN.getDefaultState().with(Properties.ROTATION, rotation);
+
         if (!signState.canPlaceAt(world, pos) || !world.setBlockState(pos, signState, 3)) {
-            LOGGER.warn("[BrokenStarSMP/CheckHacks] sign place failed player={} hack={}", player.getName().getString(), hackId);
-            RUNS.remove(player.getUuid());
+            LOGGER.warn("[BrokenStarSMP/CheckHacks] sign place failed player={} hack={}",
+                    player.getName().getString(), hackId);
+
             world.setBlockState(pos, previous, 3);
+            run.resumeAtTick = server.getTicks() + 20;
             return;
         }
+
         if (!(world.getBlockEntity(pos) instanceof SignBlockEntity sign)) {
             world.setBlockState(pos, previous, 3);
-            RUNS.remove(player.getUuid());
+            run.resumeAtTick = server.getTicks() + 20;
             return;
         }
+
         String key = entry.key == null ? "" : entry.key;
-        Text[] messages = new Text[]{Text.translatable(key), Text.empty(), Text.empty(), Text.empty()};
+        Text[] messages = new Text[] {
+                Text.translatable(key),
+                Text.empty(),
+                Text.empty(),
+                Text.empty()
+        };
+
         SignText signText = new SignText(messages, messages, DyeColor.BLACK, false);
         sign.setText(signText, true);
         sign.setEditor(player.getUuid());
@@ -304,6 +322,7 @@ public final class TranslationProbeController {
 
         int start = server.getTicks();
         int deadline = start + Math.max(20, fileConfig.timeoutTicks);
+
         run.waiting = new WaitingSign(
                 hackId,
                 key,
@@ -315,8 +334,10 @@ public final class TranslationProbeController {
                 deadline,
                 world.getRegistryKey()
         );
+
         player.openEditSignScreen(sign, true);
-        LOGGER.info("[BrokenStarSMP/CheckHacks] start player={} hack={} key={}", player.getName().getString(), hackId, key);
+        LOGGER.info("[BrokenStarSMP/CheckHacks] start player={} hack={} key={}",
+                player.getName().getString(), hackId, key);
     }
 
     private static void afterSingleHack(MinecraftServer server, ServerPlayerEntity player, CheckRun run, HackProbeResult res) {
