@@ -1,40 +1,42 @@
 package com.palordersoftworks.economycraft;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.palordersoftworks.economycraft.orders.OrderManager;
-import com.palordersoftworks.economycraft.orders.OrderRequest;
-import com.palordersoftworks.economycraft.orders.OrdersUi;
-import com.palordersoftworks.economycraft.playervault.PlayerVaultCommands;
-import com.palordersoftworks.economycraft.shop.ServerShopUi;
-import com.palordersoftworks.economycraft.shop.ShopListing;
-import com.palordersoftworks.economycraft.shop.ShopManager;
-import com.palordersoftworks.economycraft.shop.ShopUi;
-import com.palordersoftworks.economycraft.util.IdentifierCompat;
 import com.palordersoftworks.economycraft.util.IdentityCompat;
+import com.palordersoftworks.economycraft.util.IdentifierCompat;
 import com.palordersoftworks.economycraft.util.PermissionCompat;
-import com.palordersoftworks.economycraft.wand.SellWand;
 import net.minecraft.command.argument.GameProfileArgumentType;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Hand;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+
 import java.util.concurrent.CompletableFuture;
+import com.palordersoftworks.economycraft.shop.ShopManager;
+import com.palordersoftworks.economycraft.shop.ShopListing;
+import com.palordersoftworks.economycraft.shop.ShopUi;
+import com.palordersoftworks.economycraft.shop.ServerShopUi;
+import com.palordersoftworks.economycraft.orders.OrderManager;
+import com.palordersoftworks.economycraft.orders.OrderRequest;
+import com.palordersoftworks.economycraft.orders.OrdersUi;
+import com.palordersoftworks.economycraft.playervault.PlayerVaultCommands;
+import com.palordersoftworks.economycraft.wand.SellWand;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Hand;
 
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 public final class EconomyCommands {
     private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
@@ -165,36 +167,7 @@ public final class EconomyCommands {
             root.then(buildServerShop());
         }
 
-        // Add the config reload subcommand
-        root.then(buildConfigReload());
-
         return root;
-    }
-
-    // =====================================================================
-    // === Config reload command ===========================================
-    // =====================================================================
-
-    private static LiteralArgumentBuilder<ServerCommandSource> buildConfigReload() {
-        return literal("config")
-                .requires(PermissionCompat.gamemaster()) // restrict to gamemasters
-                .then(literal("reload")
-                        .executes(ctx -> reloadConfig(ctx.getSource())));
-    }
-
-    private static int reloadConfig(ServerCommandSource source) {
-        // Load the configuration and log the result
-        try {
-            EconomyConfig.load(source.getServer()); // Reload config with the current server
-            source.sendFeedback(() -> Text.literal("Configuration successfully reloaded!")
-                    .formatted(Formatting.GREEN), true);
-
-            return 1; // Success
-        } catch (Exception e) {
-            source.sendError(Text.literal("Failed to reload configuration. Check server logs.")
-                    .formatted(Formatting.RED));
-            return 0; // Failure
-        }
     }
 
     // =====================================================================
