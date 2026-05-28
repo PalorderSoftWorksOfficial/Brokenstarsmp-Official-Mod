@@ -83,6 +83,7 @@ dependencies {
     luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
     modCompileOnly(files("libs/essential_commands-0.38.6-mc1.21.11.jar"))
+    compileOnly 'net.luckperms:api:5.4'
 }
 
 processResources {
