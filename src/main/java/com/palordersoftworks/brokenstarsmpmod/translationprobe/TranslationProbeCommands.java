@@ -53,7 +53,7 @@ public final class TranslationProbeCommands {
                                                 TranslationProbeController.startPlayerCheck(
                                                         target,
                                                         ctx.getSource().getServer(),
-                                                        null
+                                                        (String) null
                                                 );
                                                 ctx.getSource().sendFeedback(
                                                         () -> Text.literal("[CheckHacks] Started group check for "
