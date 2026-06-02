@@ -1,5 +1,6 @@
 package com.palordersoftworks.brokenstarsmpmod.initiaters;
 
+import com.palordersoftworks.brokenstarsmpmod.commands.AptCommand;
 import com.palordersoftworks.brokenstarsmpmod.commands.LinkFishingRod;
 import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
@@ -56,7 +57,10 @@ public class DropAtFeet implements ModInitializer {
         ConfigManager.registerCommands();
         TranslationProbeCommands.register();
 
-        CommandRegistrationCallback.EVENT.register(LinkFishingRod::register);
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            LinkFishingRod.register(dispatcher, registryAccess, environment);
+            AptCommand.register(dispatcher, registryAccess, environment);
+        });
 
         ServerLifecycleEvents.SERVER_STARTED.register(TranslationProbeController::init);
         ServerLifecycleEvents.SERVER_STOPPING.register(TranslationProbeController::onServerStopping);
