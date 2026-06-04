@@ -24,20 +24,56 @@ public final class AptCommand {
                 .requires(PermissionUtil::isOwnerOrDev)
                 .then(literal("search")
                         .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> search(context.getSource(), StringArgumentType.getString(context, "query")))))
+                                .executes(context -> {
+                                    try {
+                                        return search(context.getSource(), StringArgumentType.getString(context, "query"));
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })))
                 .then(literal("install")
                         .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> install(context.getSource(), StringArgumentType.getString(context, "query")))))
+                                .executes(context -> {
+                                    try {
+                                        return install(context.getSource(), StringArgumentType.getString(context, "query"));
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })))
                 .then(literal("remove")
                         .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> remove(context.getSource(), StringArgumentType.getString(context, "query")))))
+                                .executes(context -> {
+                                    try {
+                                        return remove(context.getSource(), StringArgumentType.getString(context, "query"));
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })))
                 .then(literal("update")
-                        .executes(context -> update(context.getSource())))
+                        .executes(context -> {
+                            try {
+                                return update(context.getSource());
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }))
                 .then(literal("list")
-                        .executes(context -> list(context.getSource())))
+                        .executes(context -> {
+                            try {
+                                return list(context.getSource());
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }))
                 .then(literal("info")
                         .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> info(context.getSource(), StringArgumentType.getString(context, "query"))))));
+                                .executes(context -> {
+                                    try {
+                                        return info(context.getSource(), StringArgumentType.getString(context, "query"));
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                }))));
     }
 
     private static int search(ServerCommandSource source, String query) throws IOException {

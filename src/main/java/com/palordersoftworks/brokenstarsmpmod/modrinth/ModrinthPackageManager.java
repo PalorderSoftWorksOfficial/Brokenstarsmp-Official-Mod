@@ -35,7 +35,7 @@ public final class ModrinthPackageManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path MODS_DIR = FabricLoader.getInstance().getGameDir().resolve("mods");
     private static final Path MANIFEST_FILE = MODS_DIR.resolve(".brokenstarsmp-apt.json");
-    private static final String GAME_VERSION = SharedConstants.getGameVersion().getName();
+    private static final String GAME_VERSION = SharedConstants.getGameVersion().toString();
     private static final String LOADER = "fabric";
 
     private ModrinthPackageManager() {
