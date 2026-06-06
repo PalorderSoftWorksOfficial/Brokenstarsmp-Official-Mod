@@ -3,7 +3,6 @@ package com.palordersoftworks.brokenstarsmpmod.unstablesmp;
 import com.palordersoftworks.brokenstarsmpmod.config.UnstableSMPRules;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -76,7 +75,7 @@ public final class UnstableSMPFeatures {
             return;
         }
 
-        ServerWorld world = origin.getServerWorld();
+        ServerWorld world = (ServerWorld) origin.getWorld();
         double radius = Math.max(0, UnstableSMPRules.PROXIMITY_MESSAGES_DISTANCE);
         double radiusSq = radius * radius;
 
@@ -89,7 +88,7 @@ public final class UnstableSMPFeatures {
     }
 
     public static void playWitherSound(ServerPlayerEntity victim) {
-        ServerWorld world = victim.getServerWorld();
+        ServerWorld world = (ServerWorld) victim.getWorld();
         float volume = Math.max(1.0F, UnstableSMPRules.WITHER_SOUND_DISTANCE / 16.0F);
         world.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.PLAYERS, volume, 1.0F);
     }
