@@ -1,12 +1,15 @@
 package com.palordersoftworks.brokenstarsmpmod.initiaters;
 
 import com.palordersoftworks.brokenstarsmpmod.commands.AptCommand;
+import com.palordersoftworks.brokenstarsmpmod.commands.ImmortalCommand;
 import com.palordersoftworks.brokenstarsmpmod.commands.LinkFishingRod;
 import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.config.UnstableSMPRules;
 import com.palordersoftworks.brokenstarsmpmod.fluid.CobbleOreQueue;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeCommands;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeController;
+import com.palordersoftworks.brokenstarsmpmod.unstablesmp.UnstableSMPFeatures;
 import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.luaj.accesswidener.LuaCommands;
 import com.palordersoftworks.luaj.accesswidener.LuaScriptManager;
@@ -54,12 +57,15 @@ public class DropAtFeet implements ModInitializer {
         });
 
         ConfigManager.registerAnnotatedConfigs(ServerRules.class);
+        ConfigManager.registerAnnotatedConfigs(UnstableSMPRules.class);
         ConfigManager.registerCommands();
         TranslationProbeCommands.register();
+        UnstableSMPFeatures.register();
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             LinkFishingRod.register(dispatcher, registryAccess, environment);
             AptCommand.register(dispatcher, registryAccess, environment);
+            ImmortalCommand.register(dispatcher, registryAccess, environment);
         });
 
         ServerLifecycleEvents.SERVER_STARTED.register(TranslationProbeController::init);
