@@ -13,6 +13,7 @@
     "ExperienceOrbEntity_Mixin",
     "ExperienceOrbEntity_NoSplitMixin",
     "FireBlock_Mixin",
+    "FishingRodItem_Mixin",
     "FluidBlockMixin",
     "HopperBlockEntity_Mixin",
     "ItemDispenserBehaviorMixin",

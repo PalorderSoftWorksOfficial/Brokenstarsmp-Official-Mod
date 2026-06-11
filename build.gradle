@@ -51,6 +51,7 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
     modImplementation "eu.pb4:placeholder-api:2.8.2+1.21.10"
+    modImplementation include("eu.pb4:sgui:1.12.0+1.21.11")
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4")
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.4"
     compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.4"

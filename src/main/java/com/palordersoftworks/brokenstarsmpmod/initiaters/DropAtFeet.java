@@ -19,33 +19,22 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.NbtComponent;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.FishingBobberEntity;
-import net.minecraft.item.FishingRodItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ActionResult;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 import static com.palordersoftworks.brokenstarsmpmod.config.ServerRules.DROP_AT_FEET_RADIUS;
 
 public class DropAtFeet implements ModInitializer {
 
-    private static final List<ScheduledTask> SCHEDULED_TASKS = new ArrayList<>();
-    private static long serverTick;
+    public static final List<ScheduledTask> SCHEDULED_TASKS = new ArrayList<>();
+    public static long serverTick;
 
     @Override
     public void onInitialize() {
@@ -111,81 +100,7 @@ public class DropAtFeet implements ModInitializer {
             }
         });
 
-        UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (world.isClient()) return ActionResult.PASS;
-            if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
-
-            ItemStack stack = player.getStackInHand(hand);
-            if (!(stack.getItem() instanceof FishingRodItem)) return ActionResult.PASS;
-
-            NbtComponent customData = stack.get(DataComponentTypes.CUSTOM_DATA);
-            if (customData == null || customData.isEmpty()) return ActionResult.PASS;
-
-            NbtCompound nbt = customData.copyNbt();
-            if (!"void".equals(nbt.getString("RodType"))) return ActionResult.PASS;
-            if (!serverPlayer.getUuidAsString().equals(nbt.getString("Voidrodowner"))) return ActionResult.PASS;
-
-            int rodUse = nbt.getInt("RodUse",0) + 1;
-            nbt.putInt("RodUse", rodUse);
-            NbtComponent.set(DataComponentTypes.CUSTOM_DATA, stack, nbt);
-
-            if (rodUse == 1) {
-                runLater(130, () -> {
-                    if (!serverPlayer.isAlive()) return;
-                    ItemStack held = serverPlayer.getStackInHand(hand);
-                    NbtComponent heldData = held.get(DataComponentTypes.CUSTOM_DATA);
-                    if (heldData == null || heldData.isEmpty()) return;
-
-                    NbtCompound heldNbt = heldData.copyNbt();
-                    if (!"void".equals(heldNbt.getString("RodType"))) return;
-                    if (!serverPlayer.getUuidAsString().equals(heldNbt.getString("Voidrodowner"))) return;
-
-                    heldNbt.putInt("RodUse", 0);
-                    NbtComponent.set(DataComponentTypes.CUSTOM_DATA, held, heldNbt);
-                });
-                return ActionResult.PASS;
-            }
-
-            if (rodUse < 2) return ActionResult.PASS;
-
-            FishingBobberEntity hook = serverPlayer.fishHook;
-            if (hook == null) {
-                nbt.putInt("RodUse", 0);
-                NbtComponent.set(DataComponentTypes.CUSTOM_DATA, stack, nbt);
-                return ActionResult.PASS;
-            }
-
-            Entity hooked = hook.getHookedEntity();
-            if (!(hooked instanceof ServerPlayerEntity target)) {
-                nbt.putInt("RodUse", 0);
-                NbtComponent.set(DataComponentTypes.CUSTOM_DATA, stack, nbt);
-                return ActionResult.PASS;
-            }
-
-            runLater(20, () -> {
-                if (!target.isAlive()) return;
-                target.teleport(
-                        target.getEntityWorld(),
-                        target.getX(),
-                        -64.0,
-                        target.getZ(),
-                        Set.<PositionFlag>of(),
-                        target.getYaw(1.0F),
-                        target.getPitch(1.0F),
-                        false
-                );
-            });
-
-            nbt.putInt("RodUse", 0);
-            NbtComponent.set(DataComponentTypes.CUSTOM_DATA, stack, nbt);
-            return ActionResult.PASS;
-        });
-
         LuaCommands.register();
-    }
-
-    private static void runLater(int delayTicks, Runnable action) {
-        SCHEDULED_TASKS.add(new ScheduledTask(serverTick + delayTicks, action));
     }
 
     private static void tickScheduledTasks() {
@@ -198,6 +113,6 @@ public class DropAtFeet implements ModInitializer {
         }
     }
 
-    private record ScheduledTask(long executeAt, Runnable action) {
+    public record ScheduledTask(long executeAt, Runnable action) {
     }
 }
