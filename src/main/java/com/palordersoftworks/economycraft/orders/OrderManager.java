@@ -61,6 +61,11 @@ public class OrderManager {
         return r;
     }
 
+    public void markChanged() {
+        notifyListeners();
+        save();
+    }
+
     public void addDelivery(UUID player, ItemStack stack) {
         deliveries.computeIfAbsent(player, k -> new ArrayList<>()).add(stack);
         save();
@@ -116,7 +121,6 @@ public class OrderManager {
                             IdentifierCompat.Id rl = IdentifierCompat.tryParse(itemId);
                             if (rl != null) {
                                 Optional<Item> opt = IdentifierCompat.registryGetOptional(Registries.ITEM, rl);
-
                                 if (opt.isPresent()) {
                                     Item item = opt.get();
                                     stack = new ItemStack(item, count);
