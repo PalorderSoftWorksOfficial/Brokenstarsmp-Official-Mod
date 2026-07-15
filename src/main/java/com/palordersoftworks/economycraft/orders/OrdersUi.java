@@ -6,30 +6,30 @@ import com.palordersoftworks.economycraft.EconomyManager;
 import com.palordersoftworks.economycraft.util.ChatCompat;
 import com.palordersoftworks.economycraft.util.IdentityCompat;
 import com.palordersoftworks.economycraft.util.ProfileComponentCompat;
-import net.minecraft.util.Formatting;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.Text;
 import net.minecraft.component.DataComponentTypes;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.screen.NamedScreenHandlerFactory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.component.type.LoreComponent;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.screen.slot.Slot;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.component.type.LoreComponent;
+import net.minecraft.screen.NamedScreenHandlerFactory;
+import net.minecraft.screen.ScreenHandler;
+import net.minecraft.screen.ScreenHandlerType;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
 
 public final class OrdersUi {
     private OrdersUi() {}
+
     private static final Formatting LABEL_PRIMARY_COLOR = Formatting.GOLD;
     private static final Formatting LABEL_SECONDARY_COLOR = Formatting.AQUA;
     private static final Formatting VALUE_COLOR = Formatting.DARK_PURPLE;
@@ -38,20 +38,29 @@ public final class OrdersUi {
     private static final Formatting BALANCE_VALUE_COLOR = Formatting.DARK_PURPLE;
 
     public static void open(ServerPlayerEntity player, EconomyManager eco) {
-        Text title = Text.literal("Orders");
         player.openHandledScreen(new NamedScreenHandlerFactory() {
             @Override
             public Text getDisplayName() {
-                return title;
+                return Text.literal("Orders");
             }
 
             @Override
             public ScreenHandler createMenu(int id, PlayerInventory inv, PlayerEntity p) {
-                try {
-                    return new RequestMenu(id, inv, eco.getOrders(), eco, player);
-                } catch (Exception e) {
-                    throw e;
-                }
+                return new RequestMenu(id, inv, eco.getOrders(), eco, player);
+            }
+        });
+    }
+
+    public static void openClaims(ServerPlayerEntity player, EconomyManager eco) {
+        player.openHandledScreen(new NamedScreenHandlerFactory() {
+            @Override
+            public Text getDisplayName() {
+                return Text.literal("Deliveries");
+            }
+
+            @Override
+            public ScreenHandler createMenu(int id, PlayerInventory inv, PlayerEntity p) {
+                return new ClaimMenu(id, inv, eco, player.getUuid());
             }
         });
     }
@@ -64,7 +73,7 @@ public final class OrdersUi {
         return labeledValue("Reward", value.toString(), LABEL_PRIMARY_COLOR);
     }
 
-    private static ItemStack createBalanceItem(EconomyManager eco, UUID playerId, @Nullable ServerPlayerEntity player, @Nullable String name) {
+    private static ItemStack createBalanceItem(EconomyManager eco, UUID playerId, ServerPlayerEntity player, String name) {
         ItemStack head = new ItemStack(Items.PLAYER_HEAD);
         var profile = player != null
                 ? ProfileComponentCompat.tryResolvedOrUnresolved(player.getGameProfile())
@@ -91,18 +100,6 @@ public final class OrdersUi {
                         .styled(s -> s.withItalic(false).withColor(VALUE_COLOR)));
     }
 
-    public static void openClaims(ServerPlayerEntity player, EconomyManager eco) {
-        player.openHandledScreen(new NamedScreenHandlerFactory() {
-            @Override
-            public Text getDisplayName() { return Text.literal("Deliveries"); }
-
-            @Override
-            public ScreenHandler createMenu(int id, PlayerInventory inv, PlayerEntity p) {
-                return new ClaimMenu(id, inv, eco, player.getUuid());
-            }
-        });
-    }
-
     private static class RequestMenu extends ScreenHandler {
         private final OrderManager orders;
         private final EconomyManager eco;
@@ -124,8 +121,15 @@ public final class OrdersUi {
                 int r = i / 9;
                 int c = i % 9;
                 this.addSlot(new Slot(container, i, 8 + c * 18, 18 + r * 18) {
-                    @Override public boolean canTakeItems(PlayerEntity player) { return false; }
-                    @Override public boolean canInsert(ItemStack stack) { return false; }
+                    @Override
+                    public boolean canTakeItems(PlayerEntity player) {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean canInsert(ItemStack stack) {
+                        return false;
+                    }
                 });
             }
             int y = 18 + 6 * 18 + 14;
@@ -151,120 +155,112 @@ public final class OrdersUi {
                 int index = start + i;
                 if (index >= requests.size()) break;
 
-                OrderRequest r = requests.get(index);
-                ItemStack display = r.item.copy();
+                OrderRequest request = requests.get(index);
+                ItemStack display = request.item.copy();
+                display.setCount(1);
 
-                String reqName;
-                ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(r.requester);
+                String requesterName;
+                ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(request.requester);
                 if (requesterPlayer != null) {
-                    reqName = IdentityCompat.of(requesterPlayer).name();
+                    requesterName = IdentityCompat.of(requesterPlayer).name();
                 } else {
-                    reqName = EconomyCraft.getManager(server).getBestName(r.requester);
+                    requesterName = EconomyCraft.getManager(server).getBestName(request.requester);
                 }
 
-                long tax = Math.round(r.price * EconomyConfig.get().taxRate);
-                display.set(net.minecraft.component.DataComponentTypes.LORE,
-                        new net.minecraft.component.type.LoreComponent(List.of(
-                                createRewardLore(r.price, tax),
-                                labeledValue("Amount", String.valueOf(r.amount), LABEL_PRIMARY_COLOR),
-                                labeledValue("Requester", reqName, LABEL_SECONDARY_COLOR)
-                        )));
-                display.setCount(1);
+                long tax = Math.round(request.price * EconomyConfig.get().taxRate);
+                display.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                        createRewardLore(request.price, tax),
+                        labeledValue("Amount", String.valueOf(request.amount), LABEL_PRIMARY_COLOR),
+                        labeledValue("Requester", requesterName, LABEL_SECONDARY_COLOR)
+                )));
                 container.setStack(i, display);
             }
 
             if (page > 0) {
                 ItemStack prev = new ItemStack(Items.ARROW);
-                prev.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME, Text.literal("Previous page").styled(s -> s.withItalic(false)));
+                prev.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Previous page").styled(s -> s.withItalic(false)));
                 container.setStack(navRowStart + 2, prev);
             }
 
             if (start + 45 < requests.size()) {
                 ItemStack next = new ItemStack(Items.ARROW);
-                next.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME, Text.literal("Next page").styled(s -> s.withItalic(false)));
+                next.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Next page").styled(s -> s.withItalic(false)));
                 container.setStack(navRowStart + 6, next);
             }
 
-            ItemStack balance = createBalanceItem(eco, viewer.getUuid(), viewer, IdentityCompat.of(viewer).name());
+            String name = IdentityCompat.of(viewer).name();
+            ItemStack balance = createBalanceItem(eco, viewer.getUuid(), viewer, name);
             container.setStack(navRowStart, balance);
 
             ItemStack paper = new ItemStack(Items.PAPER);
-            paper.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME,
-                    Text.literal("Page " + (page + 1) + "/" + Math.max(1, totalPages)).styled(s -> s.withItalic(false)));
+            paper.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Page " + (page + 1) + "/" + Math.max(1, totalPages)).styled(s -> s.withItalic(false)));
             container.setStack(navRowStart + 4, paper);
         }
 
         @Override
-        public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
+        public void onSlotClick(int slot, int drag, SlotActionType type, PlayerEntity player) {
             if (slot < 0 || slot >= this.slots.size()) {
-                return; // ignore invalid clicks (including -999)
+                return;
             }
             if (type == SlotActionType.PICKUP) {
                 if (slot < 45) {
                     int index = page * 45 + slot;
                     if (index < requests.size()) {
-                        OrderRequest req = requests.get(index);
-                        if (req.requester.equals(player.getUuid())) {
-                            openRemove((ServerPlayerEntity) player, req);
+                        OrderRequest request = requests.get(index);
+                        if (request.requester.equals(player.getUuid())) {
+                            openRemove((ServerPlayerEntity) player, request);
                         } else {
-                            openConfirm((ServerPlayerEntity) player, req);
+                            openConfirm((ServerPlayerEntity) player, request);
                         }
                         return;
                     }
                 }
-                if (slot == navRowStart + 2 && page > 0) { page--; updatePage(); return; }
-                if (slot == navRowStart + 6 && (page + 1) * 45 < requests.size()) { page++; updatePage(); return; }
-            }
-            super.onSlotClick(slot, dragType, type, player);
-        }
-
-        private boolean hasItems(ServerPlayerEntity player, ItemStack proto, int amount) {
-            int total = 0;
-            for (int i = 0; i < player.getInventory().size(); i++) {
-                ItemStack s = player.getInventory().getStack(i);
-                if (s.isOf(proto.getItem())) total += s.getCount();
-            }
-            return total >= amount;
-        }
-
-        private void removeItems(ServerPlayerEntity player, ItemStack proto, int amount) {
-            int remaining = amount;
-            for (int i = 0; i < player.getInventory().size(); i++) {
-                ItemStack s = player.getInventory().getStack(i);
-                if (s.isOf(proto.getItem())) {
-                    int take = Math.min(s.getCount(), remaining);
-                    s.decrement(take);
-                    remaining -= take;
-                    if (remaining <= 0) return;
+                if (slot == navRowStart + 2 && page > 0) {
+                    page--;
+                    updatePage();
+                    return;
+                }
+                if (slot == navRowStart + 6 && (page + 1) * 45 < requests.size()) {
+                    page++;
+                    updatePage();
+                    return;
                 }
             }
+            super.onSlotClick(slot, drag, type, player);
         }
 
-        private void openConfirm(ServerPlayerEntity player, OrderRequest req) {
+        private void openConfirm(ServerPlayerEntity player, OrderRequest request) {
             player.openHandledScreen(new NamedScreenHandlerFactory() {
                 @Override
-                public Text getDisplayName() { return Text.literal("Confirm"); }
+                public Text getDisplayName() {
+                    return Text.literal("Confirm");
+                }
 
                 @Override
                 public ScreenHandler createMenu(int id, PlayerInventory inv, PlayerEntity p) {
-                    return new ConfirmMenu(id, inv, req, RequestMenu.this);
+                    return new ConfirmMenu(id, inv, request, RequestMenu.this);
                 }
             });
         }
 
-        private void openRemove(ServerPlayerEntity player, OrderRequest req) {
+        private void openRemove(ServerPlayerEntity player, OrderRequest request) {
             player.openHandledScreen(new NamedScreenHandlerFactory() {
                 @Override
-                public Text getDisplayName() { return Text.literal("Remove"); }
+                public Text getDisplayName() {
+                    return Text.literal("Remove");
+                }
 
                 @Override
                 public ScreenHandler createMenu(int id, PlayerInventory inv, PlayerEntity p) {
-                    return new RemoveMenu(id, inv, req, RequestMenu.this);
+                    return new RemoveMenu(id, inv, request, RequestMenu.this);
                 }
             });
         }
 
-        @Override public boolean canUse(PlayerEntity player) { return true; }
+        @Override
+        public boolean canUse(PlayerEntity player) {
+            return true;
+        }
 
         @Override
         public void onClosed(PlayerEntity player) {
@@ -272,7 +268,10 @@ public final class OrdersUi {
             orders.removeListener(listener);
         }
 
-        @Override public ItemStack quickMove(PlayerEntity player, int idx) { return ItemStack.EMPTY; }
+        @Override
+        public ItemStack quickMove(PlayerEntity player, int idx) {
+            return ItemStack.EMPTY;
+        }
     }
 
     private static class ConfirmMenu extends ScreenHandler {
@@ -280,44 +279,50 @@ public final class OrdersUi {
         private final RequestMenu parent;
         private final SimpleInventory container = new SimpleInventory(9);
 
-        ConfirmMenu(int id, PlayerInventory inv, OrderRequest req, RequestMenu parent) {
+        ConfirmMenu(int id, PlayerInventory inv, OrderRequest request, RequestMenu parent) {
             super(ScreenHandlerType.GENERIC_9X1, id);
-            this.request = req;
+            this.request = request;
             this.parent = parent;
 
+            int give = Math.min(OrderFulfillment.countHeld(parent.viewer, request.item), request.amount);
+            long payout = OrderFulfillment.payoutFor(request, give);
+
             ItemStack confirm = new ItemStack(Items.LIME_STAINED_GLASS_PANE);
-            confirm.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME,
-                    Text.literal("Confirm").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.GREEN)));
+            confirm.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Confirm").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.GREEN)));
+            confirm.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                    labeledValue("Give", give + " of " + request.amount, LABEL_PRIMARY_COLOR),
+                    labeledValue("Earn", EconomyCraft.formatMoney(payout), LABEL_PRIMARY_COLOR)
+            )));
             container.setStack(2, confirm);
 
-            ItemStack item = req.item.copy();
+            ItemStack item = request.item.copy();
+            item.setCount(1);
             var server = parent.viewer.getEntityWorld().getServer();
-
             String requesterName;
-            ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(req.requester);
+            ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(request.requester);
             if (requesterPlayer != null) {
                 requesterName = IdentityCompat.of(requesterPlayer).name();
             } else {
-                requesterName = EconomyCraft.getManager(server).getBestName(req.requester);
+                requesterName = EconomyCraft.getManager(server).getBestName(request.requester);
             }
-
-            long tax = Math.round(req.price * EconomyConfig.get().taxRate);
-            item.set(net.minecraft.component.DataComponentTypes.LORE,
-                    new net.minecraft.component.type.LoreComponent(List.of(
-                            createRewardLore(req.price, tax),
-                            labeledValue("Amount", String.valueOf(req.amount), LABEL_PRIMARY_COLOR),
-                            labeledValue("Requester", requesterName, LABEL_SECONDARY_COLOR)
-                    )));
+            long tax = Math.round(request.price * EconomyConfig.get().taxRate);
+            item.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                    createRewardLore(request.price, tax),
+                    labeledValue("Amount", String.valueOf(request.amount), LABEL_PRIMARY_COLOR),
+                    labeledValue("Requester", requesterName, LABEL_SECONDARY_COLOR)
+            )));
             container.setStack(4, item);
 
             ItemStack cancel = new ItemStack(Items.RED_STAINED_GLASS_PANE);
-            cancel.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME,
-                    Text.literal("Cancel").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.DARK_RED)));
+            cancel.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Cancel").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.DARK_RED)));
             container.setStack(6, cancel);
 
             for (int i = 0; i < 9; i++) {
                 this.addSlot(new Slot(container, i, 8 + i * 18, 20) {
-                    @Override public boolean canTakeItems(PlayerEntity p) { return false; }
+                    @Override
+                    public boolean canTakeItems(PlayerEntity player) {
+                        return false;
+                    }
                 });
             }
 
@@ -335,7 +340,7 @@ public final class OrdersUi {
         @Override
         public void onSlotClick(int slot, int drag, SlotActionType type, PlayerEntity player) {
             if (slot < 0 || slot >= this.slots.size()) {
-                return; // ignore invalid clicks (including -999)
+                return;
             }
             if (type == SlotActionType.PICKUP) {
                 if (slot == 2) {
@@ -345,75 +350,39 @@ public final class OrdersUi {
 
                     if (current == null) {
                         serverPlayer.sendMessage(Text.literal("Request no longer available").formatted(Formatting.RED));
-                    } else if (!parent.hasItems(serverPlayer, current.item, current.amount)) {
-                        serverPlayer.sendMessage(Text.literal("Not enough items").formatted(Formatting.RED));
                     } else {
-                        long cost = current.price;
-                        long bal = parent.eco.getBalance(current.requester, true);
-                        if (bal < cost) {
-                            serverPlayer.sendMessage(Text.literal("Requester can't pay").formatted(Formatting.RED));
+                        int give = Math.min(OrderFulfillment.countHeld(serverPlayer, current.item), current.amount);
+                        if (give <= 0) {
+                            serverPlayer.sendMessage(Text.literal("You have none to give").formatted(Formatting.RED));
                         } else {
-                            parent.removeItems(serverPlayer, current.item.copy(), current.amount);
-                            long tax = Math.round(cost * EconomyConfig.get().taxRate);
-                            parent.eco.removeMoney(current.requester, cost);
-                            parent.eco.addMoney(player.getUuid(), cost - tax);
-                            parent.orders.removeRequest(current.id);
-
-                            int remaining = current.amount;
-                            while (remaining > 0) {
-                                int c = Math.min(current.item.getMaxCount(), remaining);
-                                parent.orders.addDelivery(current.requester, new ItemStack(current.item.getItem(), c));
-                                remaining -= c;
-                            }
-
-                            String requesterName;
-                            ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(current.requester);
-                            if (requesterPlayer != null) {
-                                requesterName = IdentityCompat.of(requesterPlayer).name();
-                            } else {
-                                requesterName = parent.eco.getBestName(current.requester);
-                            }
-
-                            serverPlayer.sendMessage(
-                                    Text.literal("Fulfilled request for " + current.amount + "x " +
-                                                    current.item.getName().getString() + " (" + requesterName + ")" +
-                                                    " and earned " + EconomyCraft.formatMoney(cost - tax))
-                                            .formatted(Formatting.GREEN)
-                            );
-
-                            if (requesterPlayer != null) {
-                                ClickEvent ev = ChatCompat.runCommandEvent("/eco orders claim");
-                                if (ev != null) {
-                                    Text msg = Text.literal("Your request for " + current.amount + "x " +
-                                                    current.item.getName().getString() +
-                                                    " has been fulfilled: ")
-                                            .formatted(Formatting.YELLOW)
-                                            .append(Text.literal("[Claim]")
-                                                    .styled(s -> s.withUnderline(true)
-                                                            .withColor(Formatting.GREEN)
-                                                            .withClickEvent(ev)));
-                                    requesterPlayer.sendMessage(msg);
-                                } else {
-                                    ChatCompat.sendRunCommandTellraw(
-                                            requesterPlayer,
-                                            "Your request for " + current.amount + "x " + current.item.getName().getString() + " has been fulfilled: ",
-                                            "[Claim]",
-                                            "/eco orders claim"
-                                    );
+                            OrderFulfillment.Result result = OrderFulfillment.fulfill(parent.eco, serverPlayer, current.id, give);
+                            switch (result.status()) {
+                                case OK -> {
+                                    String requesterName;
+                                    ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(result.requester());
+                                    if (requesterPlayer != null) {
+                                        requesterName = IdentityCompat.of(requesterPlayer).name();
+                                    } else {
+                                        requesterName = parent.eco.getBestName(result.requester());
+                                    }
+                                    String extra = result.remaining() > 0 ? " (" + result.remaining() + " still wanted)" : "";
+                                    serverPlayer.sendMessage(Text.literal("Fulfilled " + result.given() + "x " + result.item().getHoverName().getString() + " (" + requesterName + ") and earned " + EconomyCraft.formatMoney(result.payout()) + extra).formatted(Formatting.GREEN));
                                 }
+                                case REQUESTER_CANT_PAY -> serverPlayer.sendMessage(Text.literal("Requester can't pay").formatted(Formatting.RED));
+                                case OWN_ORDER -> serverPlayer.sendMessage(Text.literal("You cannot fulfill your own request").formatted(Formatting.RED));
+                                default -> serverPlayer.sendMessage(Text.literal("Request no longer available").formatted(Formatting.RED));
                             }
-
-                            parent.requests.removeIf(r -> r.id == current.id);
-                            parent.updatePage();
                         }
                     }
-                    ((ServerPlayerEntity) player).closeHandledScreen();
-                    OrdersUi.open((ServerPlayerEntity) player, parent.eco);
+
+                    parent.updatePage();
+                    player.closeHandledScreen();
+                    OrdersUi.open(serverPlayer, parent.eco);
                     return;
                 }
 
                 if (slot == 6) {
-                    ((ServerPlayerEntity) player).closeHandledScreen();
+                    player.closeHandledScreen();
                     OrdersUi.open((ServerPlayerEntity) player, parent.eco);
                     return;
                 }
@@ -421,8 +390,15 @@ public final class OrdersUi {
             super.onSlotClick(slot, drag, type, player);
         }
 
-        @Override public boolean canUse(PlayerEntity player) { return true; }
-        @Override public ItemStack quickMove(PlayerEntity player, int idx) { return ItemStack.EMPTY; }
+        @Override
+        public boolean canUse(PlayerEntity player) {
+            return true;
+        }
+
+        @Override
+        public ItemStack quickMove(PlayerEntity player, int idx) {
+            return ItemStack.EMPTY;
+        }
     }
 
     private static class RemoveMenu extends ScreenHandler {
@@ -430,31 +406,36 @@ public final class OrdersUi {
         private final RequestMenu parent;
         private final SimpleInventory container = new SimpleInventory(9);
 
-        RemoveMenu(int id, PlayerInventory inv, OrderRequest req, RequestMenu parent) {
+        RemoveMenu(int id, PlayerInventory inv, OrderRequest request, RequestMenu parent) {
             super(ScreenHandlerType.GENERIC_9X1, id);
-            this.request = req;
+            this.request = request;
             this.parent = parent;
 
             ItemStack confirm = new ItemStack(Items.LIME_STAINED_GLASS_PANE);
-            confirm.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME,
-                    Text.literal("Confirm").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.GREEN)));
+            confirm.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Confirm").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.GREEN)));
             container.setStack(2, confirm);
 
-            ItemStack item = req.item.copy();
-            long tax = Math.round(req.price * EconomyConfig.get().taxRate);
-            item.set(net.minecraft.component.DataComponentTypes.LORE, new net.minecraft.component.type.LoreComponent(List.of(
-                    createRewardLore(req.price, tax),
-                    labeledValue("Amount", String.valueOf(req.amount), LABEL_PRIMARY_COLOR),
-                    Text.literal("This will remove the request").styled(s -> s.withItalic(false).withColor(Formatting.RED)))));
+            ItemStack item = request.item.copy();
+            item.setCount(1);
+            long tax = Math.round(request.price * EconomyConfig.get().taxRate);
+            item.set(DataComponentTypes.LORE, new LoreComponent(List.of(
+                    createRewardLore(request.price, tax),
+                    labeledValue("Amount", String.valueOf(request.amount), LABEL_PRIMARY_COLOR),
+                    Text.literal("This will remove the request").styled(s -> s.withItalic(false).withColor(Formatting.RED))
+            )));
             container.setStack(4, item);
 
             ItemStack cancel = new ItemStack(Items.RED_STAINED_GLASS_PANE);
-            cancel.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME,
-                    Text.literal("Cancel").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.DARK_RED)));
+            cancel.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Cancel").styled(s -> s.withItalic(false).withBold(true).withColor(Formatting.DARK_RED)));
             container.setStack(6, cancel);
 
             for (int i = 0; i < 9; i++) {
-                this.addSlot(new Slot(container, i, 8 + i * 18, 20) { @Override public boolean canTakeItems(PlayerEntity p) { return false; }});
+                this.addSlot(new Slot(container, i, 8 + i * 18, 20) {
+                    @Override
+                    public boolean canTakeItems(PlayerEntity player) {
+                        return false;
+                    }
+                });
             }
 
             int y = 40;
@@ -471,7 +452,7 @@ public final class OrdersUi {
         @Override
         public void onSlotClick(int slot, int drag, SlotActionType type, PlayerEntity player) {
             if (slot < 0 || slot >= this.slots.size()) {
-                return; // ignore invalid clicks (including -999)
+                return;
             }
             if (type == SlotActionType.PICKUP) {
                 if (slot == 2) {
@@ -494,8 +475,15 @@ public final class OrdersUi {
             super.onSlotClick(slot, drag, type, player);
         }
 
-        @Override public boolean canUse(PlayerEntity player) { return true; }
-        @Override public ItemStack quickMove(PlayerEntity player, int idx) { return ItemStack.EMPTY; }
+        @Override
+        public boolean canUse(PlayerEntity player) {
+            return true;
+        }
+
+        @Override
+        public ItemStack quickMove(PlayerEntity player, int idx) {
+            return ItemStack.EMPTY;
+        }
     }
 
     private static class ClaimMenu extends ScreenHandler {
@@ -520,8 +508,15 @@ public final class OrdersUi {
                 int c = i % 9;
                 int idx = i;
                 this.addSlot(new Slot(container, i, 8 + c * 18, 18 + r * 18) {
-                    @Override public boolean canInsert(ItemStack stack) { return false; }
-                    @Override public boolean canTakeItems(PlayerEntity player) { return idx < 45 && super.canTakeItems(player); }
+                    @Override
+                    public boolean canInsert(ItemStack stack) {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean canTakeItems(PlayerEntity player) {
+                        return idx < 45 && super.canTakeItems(player);
+                    }
                 });
             }
             int y = 18 + 6 * 18 + 14;
@@ -541,7 +536,7 @@ public final class OrdersUi {
             items.addAll(shopItems);
             container.clear();
             int start = page * 45;
-            int totalPages = (int)Math.ceil(items.size() / 45.0);
+            int totalPages = (int) Math.ceil(items.size() / 45.0);
             for (int i = 0; i < 45; i++) {
                 int index = start + i;
                 if (index >= items.size()) break;
@@ -557,13 +552,8 @@ public final class OrdersUi {
                 next.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Next page").styled(s -> s.withItalic(false)));
                 container.setStack(navRowStart + 6, next);
             }
-            String name = null;
             ServerPlayerEntity viewer = getViewer();
-            if (viewer != null) {
-                name = IdentityCompat.of(viewer).name();
-            } else {
-                name = eco.getBestName(owner);
-            }
+            String name = viewer != null ? IdentityCompat.of(viewer).name() : eco.getBestName(owner);
             ItemStack balance = createBalanceItem(eco, owner, viewer, name);
             container.setStack(navRowStart, balance);
             ItemStack paper = new ItemStack(Items.PAPER);
@@ -580,12 +570,15 @@ public final class OrdersUi {
             eco.getShop().removeDelivery(owner, stack);
         }
 
-        @Override public boolean canUse(PlayerEntity player) { return true; }
+        @Override
+        public boolean canUse(PlayerEntity player) {
+            return true;
+        }
 
         @Override
         public void onSlotClick(int slot, int dragType, SlotActionType type, PlayerEntity player) {
             if (slot < 0 || slot >= this.slots.size()) {
-                return; // ignore invalid clicks (including -999)
+                return;
             }
             if (type == SlotActionType.PICKUP) {
                 if (slot < 45) {
@@ -600,8 +593,16 @@ public final class OrdersUi {
                     }
                     return;
                 }
-                if (slot == navRowStart + 2 && page > 0) { page--; updatePage(); return; }
-                if (slot == navRowStart + 6 && (page + 1) * 45 < items.size()) { page++; updatePage(); return; }
+                if (slot == navRowStart + 2 && page > 0) {
+                    page--;
+                    updatePage();
+                    return;
+                }
+                if (slot == navRowStart + 6 && (page + 1) * 45 < items.size()) {
+                    page++;
+                    updatePage();
+                    return;
+                }
             }
             super.onSlotClick(slot, dragType, type, player);
         }
