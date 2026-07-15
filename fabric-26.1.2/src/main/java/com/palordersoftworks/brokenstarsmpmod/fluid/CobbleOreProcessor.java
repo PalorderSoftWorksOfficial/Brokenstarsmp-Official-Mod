@@ -40,15 +40,7 @@ public final class CobbleOreProcessor {
         Block current = serverWorld.getBlockState(pos).getBlock();
         if (current != Blocks.COBBLESTONE && current != Blocks.STONE) return;
 
-        int roll = ThreadLocalRandom.current().nextInt(1000);
-        Block ore;
-
-        if (roll < 2) {
-            ore = Blocks.ANCIENT_DEBRIS;
-        } else {
-            ore = ORE_POOL[ThreadLocalRandom.current().nextInt(ORE_POOL.length)];
-        }
-
+        Block ore = ORE_POOL[ThreadLocalRandom.current().nextInt(ORE_POOL.length)];
         serverWorld.setBlockState(pos, ore.getDefaultState(), 3);
     }
 }
