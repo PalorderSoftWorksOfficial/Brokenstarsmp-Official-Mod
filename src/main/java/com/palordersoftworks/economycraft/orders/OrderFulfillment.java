@@ -130,7 +130,7 @@ public final class OrderFulfillment {
         ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(requester);
         if (requesterPlayer == null) return;
 
-        String itemName = item.getHoverName().getString();
+        String itemName = item.getName().getString();
         String prefix = amount + "x " + itemName + " of your request has been fulfilled: ";
 
         ClickEvent event = ChatCompat.runCommandEvent("/eco orders claim");
