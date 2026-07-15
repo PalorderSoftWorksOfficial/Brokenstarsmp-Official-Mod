@@ -1,6 +1,5 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
-import com.palordersoftworks.brokenstarsmpmod.commands.PermissionUtil;
 import com.palordersoftworks.brokenstarsmpmod.initiaters.DropAtFeet;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
@@ -50,9 +49,8 @@ public abstract class FishingRodItem_Mixin {
 
         String owner = nbt.getString("Voidrodowner", "");
         boolean linkedOwner = serverPlayer.getUuidAsString().equals(owner);
-        boolean protectedUser = PermissionUtil.isProtected(serverPlayer);
 
-        if (!linkedOwner && !protectedUser) {
+        if (!linkedOwner) {
             voidEntity(serverPlayer);
             return;
         }
@@ -62,10 +60,6 @@ public abstract class FishingRodItem_Mixin {
 
         Entity hooked = hook.getHookedEntity();
         if (hooked == null) return;
-
-        if (hooked instanceof ServerPlayerEntity target && PermissionUtil.isProtected(target)) {
-            return;
-        }
 
         runLater(1, () -> voidEntity(hooked));
     }

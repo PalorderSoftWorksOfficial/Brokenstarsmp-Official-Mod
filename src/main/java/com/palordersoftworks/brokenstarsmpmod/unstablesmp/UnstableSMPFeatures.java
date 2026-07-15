@@ -59,14 +59,14 @@ public final class UnstableSMPFeatures {
     }
 
     public static boolean isImmortal(ServerPlayerEntity player) {
-        return player.getScoreboardTags().contains(IMMORTAL_TAG);
+        return player.getCommandTags().contains(IMMORTAL_TAG);
     }
 
     public static void setImmortal(ServerPlayerEntity player, boolean immortal) {
         if (immortal) {
-            player.addScoreboardTag(IMMORTAL_TAG);
+            player.addCommandTag(IMMORTAL_TAG);
         } else {
-            player.removeScoreboardTag(IMMORTAL_TAG);
+            player.removeCommandTag(IMMORTAL_TAG);
         }
     }
 
@@ -75,7 +75,7 @@ public final class UnstableSMPFeatures {
             return;
         }
 
-        ServerWorld world = (ServerWorld) origin.getWorld();
+        ServerWorld world = (ServerWorld) origin.getEntityWorld();
         double radius = Math.max(0, UnstableSMPRules.PROXIMITY_MESSAGES_DISTANCE);
         double radiusSq = radius * radius;
 
@@ -88,20 +88,20 @@ public final class UnstableSMPFeatures {
     }
 
     public static void playWitherSound(ServerPlayerEntity victim) {
-        ServerWorld world = (ServerWorld) victim.getWorld();
+        ServerWorld world = (ServerWorld) victim.getEntityWorld();
         float volume = Math.max(1.0F, UnstableSMPRules.WITHER_SOUND_DISTANCE / 16.0F);
         world.playSound(null, victim.getX(), victim.getY(), victim.getZ(), SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.PLAYERS, volume, 1.0F);
     }
 
     public static void banAndKick(ServerPlayerEntity victim) {
-        MinecraftServer server = victim.getServer();
+        MinecraftServer server = victim.getEntityWorld().getServer();
         if (server == null) {
             return;
         }
 
         String reason = UnstableSMPRules.DEATH_BAN_REASON;
         String escaped = reason.replace("\\", "\\\\").replace("\"", "\\\"");
-        server.getCommandManager().executeWithPrefix(server.getCommandSource(), "ban " + victim.getGameProfile().getName() + " \"" + escaped + "\"");
+        server.getCommandManager().parseAndExecute(server.getCommandSource(), "ban " + victim.getGameProfile().name() + " \"" + escaped + "\"");
         victim.networkHandler.disconnect(Text.literal(reason));
     }
 }
