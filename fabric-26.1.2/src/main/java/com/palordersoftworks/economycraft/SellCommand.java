@@ -1,26 +1,24 @@
 package com.palordersoftworks.economycraft;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.command.CommandManager;
-
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
-
 import net.minecraft.inventory.SimpleInventory;
+import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.screen.slot.Slot;
-
 import net.minecraft.item.ItemStack;
-
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.ContainerComponent;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class SellCommand {
 
@@ -28,10 +26,16 @@ public final class SellCommand {
 
     public static LiteralArgumentBuilder<ServerCommandSource> register() {
         return CommandManager.literal("sell")
-                .executes(ctx -> openSellGui(ctx.getSource()));
+                .executes(ctx -> openSellGui(ctx.getSource()))
+                .then(CommandManager.literal("everything").executes(ctx -> sellEverything(ctx.getSource())));
     }
 
     private static int openSellGui(ServerCommandSource source) {
+        if (!EconomyConfig.get().sellEnabled) {
+            source.sendError(Text.literal("Selling is disabled.").formatted(Formatting.RED));
+            return 0;
+        }
+
         ServerPlayerEntity player = getPlayer(source);
         if (player == null) return 0;
 
@@ -50,8 +54,51 @@ public final class SellCommand {
         return 1;
     }
 
-    private static class SellMenu extends ScreenHandler {
+    private static int sellEverything(ServerCommandSource source) {
+        if (!EconomyConfig.get().sellEnabled) {
+            source.sendError(Text.literal("Selling is disabled.").formatted(Formatting.RED));
+            return 0;
+        }
 
+        ServerPlayerEntity player = getPlayer(source);
+        if (player == null) return 0;
+
+        EconomyManager manager = EconomyCraft.getManager(player.getEntityWorld().getServer());
+        PriceRegistry prices = manager.getPrices();
+        PlayerInventory inventory = player.getInventory();
+
+        long total = 0;
+        List<Integer> soldSlots = new ArrayList<>();
+
+        for (int i = 0; i < inventory.size(); i++) {
+            ItemStack stack = inventory.getStack(i);
+            long value = getStackTotalValue(prices, stack);
+            if (value > 0) {
+                total += value;
+                soldSlots.add(i);
+            }
+        }
+
+        if (total <= 0) {
+            player.sendMessage(Text.literal("No sellable items.").formatted(Formatting.RED));
+            return 0;
+        }
+
+        if (EconomyConfig.get().dailySellLimit > 0 && !manager.tryRecordDailySell(player.getUuid(), total)) {
+            handleDailyLimitFailure(manager, player);
+            return 0;
+        }
+
+        for (int slot : soldSlots) {
+            inventory.setStack(slot, ItemStack.EMPTY);
+        }
+
+        manager.addMoney(player.getUuid(), total);
+        player.sendMessage(Text.literal("Sold for " + EconomyCraft.formatMoney(total) + ".").formatted(Formatting.GREEN));
+        return 1;
+    }
+
+    private static class SellMenu extends ScreenHandler {
         private final ServerPlayerEntity player;
         private final SimpleInventory container = new SimpleInventory(27);
 
@@ -99,7 +146,6 @@ public final class SellCommand {
                 if (stack.isEmpty()) continue;
 
                 long value = getStackTotalValue(prices, stack);
-
                 if (value > 0) {
                     total += value;
                 } else {
