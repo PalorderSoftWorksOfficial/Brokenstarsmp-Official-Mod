@@ -26,7 +26,7 @@ public abstract class ServerPlayerEntity_Mixin {
     }
 
     @Inject(method = "damage", at = @At("HEAD"), cancellable = true)
-    private void brokenstarsmpmod$smartTotemImmortality(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    private void brokenstarsmpmod$smartTotemImmortality(ServerWorld serverWorld, DamageSource damageSource, float f, CallbackInfoReturnable<Boolean> cir) {
         ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
         if (!UnstableSMPRules.IMMORTAL_SYSTEM_ENABLED) {
             return;
