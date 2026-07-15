@@ -3,7 +3,6 @@ package com.palordersoftworks.economycraft.orders;
 import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.economycraft.EconomyConfig;
 import com.palordersoftworks.economycraft.EconomyManager;
-import com.palordersoftworks.economycraft.util.ChatCompat;
 import com.palordersoftworks.economycraft.util.IdentityCompat;
 import com.palordersoftworks.economycraft.util.ProfileComponentCompat;
 import net.minecraft.component.DataComponentTypes;
@@ -19,7 +18,6 @@ import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
@@ -366,7 +364,7 @@ public final class OrdersUi {
                                         requesterName = parent.eco.getBestName(result.requester());
                                     }
                                     String extra = result.remaining() > 0 ? " (" + result.remaining() + " still wanted)" : "";
-                                    serverPlayer.sendMessage(Text.literal("Fulfilled " + result.given() + "x " + result.item().getHoverName().getString() + " (" + requesterName + ") and earned " + EconomyCraft.formatMoney(result.payout()) + extra).formatted(Formatting.GREEN));
+                                    serverPlayer.sendMessage(Text.literal("Fulfilled " + result.given() + "x " + result.item().getName().getString() + " (" + requesterName + ") and earned " + EconomyCraft.formatMoney(result.payout()) + extra).formatted(Formatting.GREEN));
                                 }
                                 case REQUESTER_CANT_PAY -> serverPlayer.sendMessage(Text.literal("Requester can't pay").formatted(Formatting.RED));
                                 case OWN_ORDER -> serverPlayer.sendMessage(Text.literal("You cannot fulfill your own request").formatted(Formatting.RED));
