@@ -8,6 +8,7 @@
   "standalone_admin_commands": true,
   "scoreboard_enabled": true,
   "server_shop_enabled": true,
+  "sell_enabled": true,
   "compact_money_display": false,
   "player_vault_enabled": true,
   "player_vault_require_permission": false,
