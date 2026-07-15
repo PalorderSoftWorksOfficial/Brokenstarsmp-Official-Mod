@@ -29,8 +29,7 @@ public final class CobbleOreProcessor {
             Blocks.DEEPSLATE_DIAMOND_ORE,
             Blocks.DEEPSLATE_EMERALD_ORE,
             Blocks.NETHER_QUARTZ_ORE,
-            Blocks.NETHER_GOLD_ORE,
-            Blocks.ANCIENT_DEBRIS
+            Blocks.NETHER_GOLD_ORE
     };
 
     public static void process(net.minecraft.world.World world, BlockPos pos) {
@@ -38,9 +37,18 @@ public final class CobbleOreProcessor {
         if (!(world instanceof ServerWorld serverWorld)) return;
         if (!serverWorld.isChunkLoaded(pos)) return;
 
-        if (!serverWorld.getBlockState(pos).isOf(Blocks.COBBLESTONE)) return;
+        Block current = serverWorld.getBlockState(pos).getBlock();
+        if (current != Blocks.COBBLESTONE && current != Blocks.STONE) return;
 
-        Block ore = ORE_POOL[ThreadLocalRandom.current().nextInt(ORE_POOL.length)];
+        int roll = ThreadLocalRandom.current().nextInt(1000);
+        Block ore;
+
+        if (roll < 2) {
+            ore = Blocks.ANCIENT_DEBRIS;
+        } else {
+            ore = ORE_POOL[ThreadLocalRandom.current().nextInt(ORE_POOL.length)];
+        }
+
         serverWorld.setBlockState(pos, ore.getDefaultState(), 3);
     }
 }
