@@ -43,6 +43,8 @@ public final class EconomyConfig {
     public boolean scoreboardEnabled;
     @SerializedName("server_shop_enabled")
     public boolean serverShopEnabled = true;
+    @SerializedName("sell_enabled")
+    public boolean sellEnabled = true;
 
     @SerializedName("compact_money_display")
     public boolean compactMoneyDisplay;
