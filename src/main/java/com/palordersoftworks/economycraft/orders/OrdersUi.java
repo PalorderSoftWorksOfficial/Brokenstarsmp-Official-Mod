@@ -340,51 +340,73 @@ public final class OrdersUi {
             if (slot < 0 || slot >= this.slots.size()) {
                 return;
             }
+
+            ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
+
             if (type == SlotActionType.PICKUP) {
                 if (slot == 2) {
                     OrderRequest current = parent.orders.getRequest(request.id);
-                    ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
                     var server = serverPlayer.getEntityWorld().getServer();
 
                     if (current == null) {
                         serverPlayer.sendMessage(Text.literal("Request no longer available").formatted(Formatting.RED));
                     } else {
                         int give = Math.min(OrderFulfillment.countHeld(serverPlayer, current.item), current.amount);
+
                         if (give <= 0) {
                             serverPlayer.sendMessage(Text.literal("You have none to give").formatted(Formatting.RED));
                         } else {
                             OrderFulfillment.Result result = OrderFulfillment.fulfill(parent.eco, serverPlayer, current.id, give);
+
                             switch (result.status()) {
                                 case OK -> {
                                     String requesterName;
                                     ServerPlayerEntity requesterPlayer = server.getPlayerManager().getPlayer(result.requester());
+
                                     if (requesterPlayer != null) {
                                         requesterName = IdentityCompat.of(requesterPlayer).name();
                                     } else {
                                         requesterName = parent.eco.getBestName(result.requester());
                                     }
+
                                     String extra = result.remaining() > 0 ? " (" + result.remaining() + " still wanted)" : "";
-                                    serverPlayer.sendMessage(Text.literal("Fulfilled " + result.given() + "x " + result.item().getName().getString() + " (" + requesterName + ") and earned " + EconomyCraft.formatMoney(result.payout()) + extra).formatted(Formatting.GREEN));
+
+                                    serverPlayer.sendMessage(
+                                            Text.literal(
+                                                    "Fulfilled " + result.given() + "x " +
+                                                            result.item().getName().getString() +
+                                                            " (" + requesterName + ") and earned " +
+                                                            EconomyCraft.formatMoney(result.payout()) +
+                                                            extra
+                                            ).formatted(Formatting.GREEN)
+                                    );
                                 }
-                                case REQUESTER_CANT_PAY -> serverPlayer.sendMessage(Text.literal("Requester can't pay").formatted(Formatting.RED));
-                                case OWN_ORDER -> serverPlayer.sendMessage(Text.literal("You cannot fulfill your own request").formatted(Formatting.RED));
-                                default -> serverPlayer.sendMessage(Text.literal("Request no longer available").formatted(Formatting.RED));
+
+                                case REQUESTER_CANT_PAY ->
+                                        serverPlayer.sendMessage(Text.literal("Requester can't pay").formatted(Formatting.RED));
+
+                                case OWN_ORDER ->
+                                        serverPlayer.sendMessage(Text.literal("You cannot fulfill your own request").formatted(Formatting.RED));
+
+                                default ->
+                                        serverPlayer.sendMessage(Text.literal("Request no longer available").formatted(Formatting.RED));
                             }
                         }
                     }
 
                     parent.updatePage();
-                    player.closeHandledScreen();
+                    serverPlayer.closeHandledScreen();
                     OrdersUi.open(serverPlayer, parent.eco);
                     return;
                 }
 
                 if (slot == 6) {
-                    player.closeHandledScreen();
-                    OrdersUi.open((ServerPlayerEntity) player, parent.eco);
+                    serverPlayer.closeHandledScreen();
+                    OrdersUi.open(serverPlayer, parent.eco);
                     return;
                 }
             }
+
             super.onSlotClick(slot, drag, type, player);
         }
 
