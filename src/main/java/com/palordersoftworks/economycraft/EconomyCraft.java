@@ -1,5 +1,6 @@
 package com.palordersoftworks.economycraft;
 
+import com.palordersoftworks.economycraft.placeholders.EconomyPlaceholders;
 import com.palordersoftworks.economycraft.playervault.PlayerVaultCommands;
 import com.palordersoftworks.economycraft.util.ChatCompat;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -46,7 +47,7 @@ public final class EconomyCraft {
                 manager.getPlayerVaults().save();
             }
         });
-
+        EconomyPlaceholders.tryRegister();
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> onPlayerJoin(handler.player, server));
     }
 
