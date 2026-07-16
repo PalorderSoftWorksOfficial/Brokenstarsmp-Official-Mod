@@ -4,14 +4,16 @@ import com.palordersoftworks.economycraft.EconomyConfig;
 import com.palordersoftworks.economycraft.EconomyCraft;
 import com.palordersoftworks.economycraft.EconomyManager;
 import com.palordersoftworks.economycraft.util.IdentifierCompat;
-import eu.pb4.placeholders.api.PlaceholderContext;
 import eu.pb4.placeholders.api.PlaceholderResult;
 import eu.pb4.placeholders.api.Placeholders;
+import eu.pb4.placeholders.api.ServerPlaceholderContext;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
 import java.util.Locale;
+import java.util.UUID;
+import java.util.function.BiFunction;
 
 public final class EconomyCraftPlaceholders {
     private EconomyCraftPlaceholders() {}
@@ -32,15 +34,18 @@ public final class EconomyCraftPlaceholders {
         registerServer("player_vault_enabled", (ctx, arg) -> PlaceholderResult.value(Text.literal(Boolean.toString(EconomyConfig.get().playerVaultEnabled))));
     }
 
-    private static void registerServer(String path, PlaceholderHandler handler) {
-        Placeholders.registerServer(IdentifierCompat.unwrap(IdentifierCompat.fromNamespaceAndPath(EconomyCraft.MOD_ID, path)), handler::apply);
+    private static void registerServer(String path, BiFunction<ServerPlaceholderContext, String, PlaceholderResult> handler) {
+        var id = IdentifierCompat.unwrap(IdentifierCompat.fromNamespaceAndPath(EconomyCraft.MOD_ID, path));
+        if (id != null) {
+            Placeholders.registerServer(id, handler::apply);
+        }
     }
 
-    private static PlaceholderResult playerValue(PlaceholderContext ctx, PlayerValueResolver resolver) {
-        if (!ctx.hasPlayer()) {
+    private static PlaceholderResult playerValue(ServerPlaceholderContext ctx, PlayerValueResolver resolver) {
+        if (!ctx.hasServerPlayer() || ctx.serverPlayer() == null) {
             return PlaceholderResult.invalid("No player context");
         }
-        ServerPlayerEntity player = (ServerPlayerEntity) ctx.getPlayer();
+        ServerPlayerEntity player = ctx.serverPlayer();
         return PlaceholderResult.value(Text.literal(resolver.resolve(player)));
     }
 
@@ -67,7 +72,7 @@ public final class EconomyCraftPlaceholders {
         return total;
     }
 
-    private static long balanceRank(EconomyManager manager, java.util.UUID playerId) {
+    private static long balanceRank(EconomyManager manager, UUID playerId) {
         Long current = manager.getBalances().get(playerId);
         if (current == null) {
             return 0L;
@@ -87,7 +92,7 @@ public final class EconomyCraftPlaceholders {
         return rank;
     }
 
-    private static long resolveVaultAmount(EconomyManager manager, java.util.UUID playerId) {
+    private static long resolveVaultAmount(EconomyManager manager, UUID playerId) {
         try {
             Object vaults = manager.getPlayerVaults();
             if (vaults == null) {
@@ -101,7 +106,7 @@ public final class EconomyCraftPlaceholders {
                     "getUnlockedVaultCount"
             }) {
                 try {
-                    var method = vaults.getClass().getMethod(methodName, java.util.UUID.class);
+                    var method = vaults.getClass().getMethod(methodName, UUID.class);
                     Object result = method.invoke(vaults, playerId);
                     if (result instanceof Number number) {
                         return Math.max(0L, number.longValue());
@@ -116,11 +121,6 @@ public final class EconomyCraftPlaceholders {
 
     private static String formatPercent(double value) {
         return String.format(Locale.ROOT, "%.0f%%", Math.max(0.0, value) * 100.0);
-    }
-
-    @FunctionalInterface
-    private interface PlaceholderHandler {
-        PlaceholderResult apply(PlaceholderContext ctx, String arg);
     }
 
     @FunctionalInterface
