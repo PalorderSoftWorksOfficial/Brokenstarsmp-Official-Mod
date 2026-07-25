@@ -554,31 +554,69 @@ public final class OrdersUi {
             items.clear();
             items.addAll(orderItems);
             items.addAll(shopItems);
+
             container.clear();
+
             int start = page * 45;
-            int totalPages = (int) Math.ceil(items.size() / 45.0);
-            for (int i = 0; i < 45; i++) {
-                int index = start + i;
-                if (index >= items.size()) break;
-                container.setStack(i, items.get(index));
+            int end = Math.min(start + 45, items.size());
+            int totalPages = Math.max(1, (int) Math.ceil(items.size() / 45.0));
+
+            for (int i = start; i < end; i++) {
+                container.setStack(i - start, items.get(i));
             }
+
             if (page > 0) {
                 ItemStack prev = new ItemStack(Items.ARROW);
-                prev.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Previous page").styled(s -> s.withItalic(false)));
+                prev.set(
+                        DataComponentTypes.CUSTOM_NAME,
+                        Text.literal("Previous Page").styled(s -> s.withItalic(false))
+                );
                 container.setStack(navRowStart + 2, prev);
             }
-            if (start + 45 < items.size()) {
+
+            if (end < items.size()) {
                 ItemStack next = new ItemStack(Items.ARROW);
-                next.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Next page").styled(s -> s.withItalic(false)));
+                next.set(
+                        DataComponentTypes.CUSTOM_NAME,
+                        Text.literal("Next Page").styled(s -> s.withItalic(false))
+                );
                 container.setStack(navRowStart + 6, next);
             }
+
             ServerPlayerEntity viewer = getViewer();
-            String name = viewer != null ? IdentityCompat.of(viewer).name() : eco.getBestName(owner);
-            ItemStack balance = createBalanceItem(eco, owner, viewer, name);
-            container.setStack(navRowStart, balance);
+            String name = viewer != null
+                    ? IdentityCompat.of(viewer).name()
+                    : eco.getBestName(owner);
+
+            container.setStack(
+                    navRowStart,
+                    createBalanceItem(eco, owner, viewer, name)
+            );
+
             ItemStack paper = new ItemStack(Items.PAPER);
-            paper.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Page " + (page + 1) + "/" + Math.max(1, totalPages)).styled(s -> s.withItalic(false)));
+            paper.set(
+                    DataComponentTypes.CUSTOM_NAME,
+                    Text.literal("Page " + (page + 1) + "/" + totalPages)
+                            .styled(s -> s.withItalic(false))
+            );
             container.setStack(navRowStart + 4, paper);
+
+            ItemStack dropAll = new ItemStack(Items.DROPPER);
+            dropAll.set(
+                    DataComponentTypes.CUSTOM_NAME,
+                    Text.literal("Claim All")
+                            .styled(s -> s.withItalic(false).withColor(Formatting.GREEN))
+            );
+            dropAll.set(
+                    DataComponentTypes.LORE,
+                    new LoreComponent(List.of(
+                            Text.literal("Claims every item")
+                                    .styled(s -> s.withItalic(false).withColor(Formatting.GRAY)),
+                            Text.literal("on this page.")
+                                    .styled(s -> s.withItalic(false).withColor(Formatting.GRAY))
+                    ))
+            );
+            container.setStack(navRowStart + 8, dropAll);
         }
 
         private ServerPlayerEntity getViewer() {
@@ -589,7 +627,55 @@ public final class OrdersUi {
             eco.getOrders().removeDelivery(owner, stack);
             eco.getShop().removeDelivery(owner, stack);
         }
+        private void claimCurrentPage(ServerPlayerEntity player) {
+            int start = page * 45;
+            int end = Math.min(start + 45, items.size());
 
+            int claimed = 0;
+
+            for (int i = start; i < end; i++) {
+                ItemStack stack = items.get(i);
+
+                if (stack.isEmpty()) {
+                    continue;
+                }
+
+                ItemStack copy = stack.copy();
+
+                if (!player.getInventory().insertStack(copy)) {
+                    break;
+                }
+
+                removeStack(stack);
+                claimed++;
+            }
+
+            orderItems.clear();
+            orderItems.addAll(eco.getOrders().getDeliveries(owner));
+
+            shopItems.clear();
+            shopItems.addAll(eco.getShop().getDeliveries(owner));
+
+            if (page * 45 >= orderItems.size() + shopItems.size() && page > 0) {
+                page--;
+            }
+
+            updatePage();
+
+            if (claimed > 0) {
+                player.sendMessage(
+                        Text.literal("Claimed " + claimed + " deliveries.")
+                                .formatted(Formatting.GREEN),
+                        false
+                );
+            } else {
+                player.sendMessage(
+                        Text.literal("No deliveries could be claimed.")
+                                .formatted(Formatting.RED),
+                        false
+                );
+            }
+        }
         @Override
         public boolean canUse(PlayerEntity player) {
             return true;
@@ -600,30 +686,43 @@ public final class OrdersUi {
             if (slot < 0 || slot >= this.slots.size()) {
                 return;
             }
+
             if (type == SlotActionType.PICKUP) {
+
                 if (slot < 45) {
                     Slot s = this.slots.get(slot);
+
                     if (s.hasStack()) {
                         ItemStack stack = s.getStack();
                         ItemStack copy = stack.copy();
+
                         if (player.getInventory().insertStack(copy)) {
                             removeStack(stack);
                             updatePage();
                         }
                     }
+
                     return;
                 }
+
                 if (slot == navRowStart + 2 && page > 0) {
                     page--;
                     updatePage();
                     return;
                 }
+
                 if (slot == navRowStart + 6 && (page + 1) * 45 < items.size()) {
                     page++;
                     updatePage();
                     return;
                 }
+
+                if (slot == navRowStart + 8) {
+                    claimCurrentPage((ServerPlayerEntity) player);
+                    return;
+                }
             }
+
             super.onSlotClick(slot, dragType, type, player);
         }
 

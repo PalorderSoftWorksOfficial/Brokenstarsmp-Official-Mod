@@ -19,7 +19,7 @@ public final class EconomyCraft {
     public static final String MOD_ID = "economycraft";
     private static EconomyManager manager;
     private static MinecraftServer lastServer;
-    private static final NumberFormat FORMAT = NumberFormat.getInstance(Locale.GERMANY);
+    private static final NumberFormat FORMAT = NumberFormat.getInstance(Locale.US);
 
     public static void registerEvents() {
         ServerLifecycleEvents.SERVER_STARTING.register(EconomyConfig::load);
@@ -98,17 +98,36 @@ public final class EconomyCraft {
         return FORMAT.format(amount) + " shards";
     }
 
+    private static final String[] MONEY_SUFFIXES = {
+            "", "K", "M", "B", "T", "Qa", "Qi"
+    };
+
     private static String formatMoneyCompact(long n) {
-        if (n >= 1_000_000_000L) {
-            return "$" + trimTrailingZeros(String.format(Locale.US, "%.2fB", n / 1_000_000_000.0));
+        if (n < 10_000L) {
+            return "€" + FORMAT.format(n);
         }
-        if (n >= 1_000_000L) {
-            return "$" + trimTrailingZeros(String.format(Locale.US, "%.2fM", n / 1_000_000.0));
+
+        int suffixIndex = 0;
+        double value = n;
+
+        while (value >= 1000.0 && suffixIndex < MONEY_SUFFIXES.length - 1) {
+            value /= 1000.0;
+            suffixIndex++;
         }
-        if (n >= 10_000L) {
-            return "$" + trimTrailingZeros(String.format(Locale.US, "%.1fk", n / 1_000.0));
+
+        String format;
+
+        if (value >= 100) {
+            format = "%.0f";
+        } else if (value >= 10) {
+            format = "%.1f";
+        } else {
+            format = "%.2f";
         }
-        return "$" + FORMAT.format(n);
+
+        return "€" + trimTrailingZeros(
+                String.format(Locale.US, format, value)
+        ) + MONEY_SUFFIXES[suffixIndex];
     }
 
     private static String trimTrailingZeros(String s) {

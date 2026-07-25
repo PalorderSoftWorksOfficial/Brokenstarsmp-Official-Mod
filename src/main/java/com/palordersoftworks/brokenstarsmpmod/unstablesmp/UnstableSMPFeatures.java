@@ -86,7 +86,7 @@ public final class UnstableSMPFeatures {
             player.networkHandler.sendPacket(new GameMessageS2CPacket(message, false));
         }
     }
-
+    // Okay to whatever made this to do duel i fucking hate you
     public static void playWitherSound(ServerPlayerEntity victim) {
         ServerWorld world = (ServerWorld) victim.getEntityWorld();
         float volume = Math.max(1.0F, UnstableSMPRules.WITHER_SOUND_DISTANCE / 16.0F);

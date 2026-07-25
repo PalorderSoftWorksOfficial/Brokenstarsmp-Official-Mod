@@ -1,21 +1,21 @@
 package com.palordersoftworks.economycraft;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.inventory.SimpleInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.GenericContainerScreenHandler;
+import net.minecraft.screen.NamedScreenHandlerFactory;
+import net.minecraft.screen.ScreenHandler;
+import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.screen.NamedScreenHandlerFactory;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ContainerComponent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -98,31 +98,18 @@ public final class SellCommand {
         return 1;
     }
 
-    private static class SellMenu extends ScreenHandler {
+    private static class SellMenu extends GenericContainerScreenHandler {
         private final ServerPlayerEntity player;
-        private final SimpleInventory container = new SimpleInventory(27);
+        private final SimpleInventory container;
 
         protected SellMenu(int syncId, PlayerInventory playerInventory, ServerPlayerEntity player) {
-            super(ScreenHandlerType.GENERIC_9X3, syncId);
+            this(syncId, playerInventory, player, new SimpleInventory(54));
+        }
+
+        private SellMenu(int syncId, PlayerInventory playerInventory, ServerPlayerEntity player, SimpleInventory container) {
+            super(ScreenHandlerType.GENERIC_9X6, syncId, playerInventory, container, 6);
             this.player = player;
-
-            for (int i = 0; i < 27; i++) {
-                int x = 8 + (i % 9) * 18;
-                int y = 18 + (i / 9) * 18;
-                this.addSlot(new Slot(container, i, x, y));
-            }
-
-            int y = 18 + 3 * 18 + 14;
-
-            for (int r = 0; r < 3; r++) {
-                for (int c = 0; c < 9; c++) {
-                    this.addSlot(new Slot(playerInventory, c + r * 9 + 9, 8 + c * 18, y + r * 18));
-                }
-            }
-
-            for (int c = 0; c < 9; c++) {
-                this.addSlot(new Slot(playerInventory, c, 8 + c * 18, y + 58));
-            }
+            this.container = container;
         }
 
         @Override
@@ -143,9 +130,11 @@ public final class SellCommand {
 
             for (int i = 0; i < container.size(); i++) {
                 ItemStack stack = container.getStack(i);
+
                 if (stack.isEmpty()) continue;
 
                 long value = getStackTotalValue(prices, stack);
+
                 if (value > 0) {
                     total += value;
                 } else {
@@ -161,16 +150,17 @@ public final class SellCommand {
                 }
 
                 manager.addMoney(sp.getUuid(), total);
-                sp.sendMessage(Text.literal("Sold for " + EconomyCraft.formatMoney(total) + ".")
-                        .formatted(Formatting.GREEN));
-            } else {
-                sp.sendMessage(Text.literal("No sellable items.").formatted(Formatting.RED));
-            }
-        }
 
-        @Override
-        public ItemStack quickMove(PlayerEntity player, int index) {
-            return ItemStack.EMPTY;
+                sp.sendMessage(
+                        Text.literal("Sold for " + EconomyCraft.formatMoney(total) + ".")
+                                .formatted(Formatting.GREEN)
+                );
+            } else {
+                sp.sendMessage(
+                        Text.literal("No sellable items.")
+                                .formatted(Formatting.RED)
+                );
+            }
         }
     }
 
