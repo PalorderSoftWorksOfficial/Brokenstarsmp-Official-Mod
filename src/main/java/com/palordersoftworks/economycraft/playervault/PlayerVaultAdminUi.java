@@ -46,7 +46,7 @@ public final class PlayerVaultAdminUi {
     }
 
     private static class PlayerSelectionMenu extends ScreenHandler {
-    // admin reference removed — not needed inside this menu
+    // admin reference removed — not needed inside this menu xD
         private final EconomyManager economy;
         private final List<UUID> players;
         private final SimpleInventory container = new SimpleInventory(54);

@@ -555,6 +555,11 @@ public final class OrdersUi {
             items.addAll(orderItems);
             items.addAll(shopItems);
 
+            // Auto-refresh: if the current page fell off the end (e.g. everything on
+            // it was just dropped/claimed), snap back to the last page that still
+            // has content instead of showing an empty grid.
+            clampPage();
+
             container.clear();
 
             int start = page * 45;
@@ -604,19 +609,34 @@ public final class OrdersUi {
             ItemStack dropAll = new ItemStack(Items.DROPPER);
             dropAll.set(
                     DataComponentTypes.CUSTOM_NAME,
-                    Text.literal("Claim All")
+                    Text.literal("Drop All")
                             .styled(s -> s.withItalic(false).withColor(Formatting.GREEN))
             );
             dropAll.set(
                     DataComponentTypes.LORE,
                     new LoreComponent(List.of(
-                            Text.literal("Claims every item")
+                            Text.literal("Drops every item")
                                     .styled(s -> s.withItalic(false).withColor(Formatting.GRAY)),
                             Text.literal("on this page.")
                                     .styled(s -> s.withItalic(false).withColor(Formatting.GRAY))
                     ))
             );
             container.setStack(navRowStart + 8, dropAll);
+        }
+
+        /**
+         * Keeps {@link #page} inside [0, totalPages-1] for the current {@link #items} size.
+         * Called any time items are removed so an emptied-out page doesn't get stuck
+         * showing nothing.
+         */
+        private void clampPage() {
+            int totalPages = Math.max(1, (int) Math.ceil(items.size() / 45.0));
+            if (page >= totalPages) {
+                page = totalPages - 1;
+            }
+            if (page < 0) {
+                page = 0;
+            }
         }
 
         private ServerPlayerEntity getViewer() {
@@ -627,13 +647,30 @@ public final class OrdersUi {
             eco.getOrders().removeDelivery(owner, stack);
             eco.getShop().removeDelivery(owner, stack);
         }
-        private void claimCurrentPage(ServerPlayerEntity player) {
+
+        private void refreshBackingLists() {
+            orderItems.clear();
+            orderItems.addAll(eco.getOrders().getDeliveries(owner));
+
+            shopItems.clear();
+            shopItems.addAll(eco.getShop().getDeliveries(owner));
+        }
+
+        /**
+         * Drops every item on the current page on the ground at the player's feet
+         * and clears it from delivery storage. Unlike claiming, this never fails
+         * due to a full inventory.
+         */
+        private void dropAllOnPage(ServerPlayerEntity player) {
             int start = page * 45;
             int end = Math.min(start + 45, items.size());
 
-            int claimed = 0;
+            int dropped = 0;
 
-            for (int i = start; i < end; i++) {
+            // Iterate back-to-front: we're mutating the backing lists as we go via
+            // removeStack(), so this avoids skipping entries after a removal shifts
+            // indices.
+            for (int i = end - 1; i >= start; i--) {
                 ItemStack stack = items.get(i);
 
                 if (stack.isEmpty()) {
@@ -641,41 +678,29 @@ public final class OrdersUi {
                 }
 
                 ItemStack copy = stack.copy();
-
-                if (!player.getInventory().insertStack(copy)) {
-                    break;
-                }
-
+                player.dropItem(copy, false);
                 removeStack(stack);
-                claimed++;
+                dropped++;
             }
 
-            orderItems.clear();
-            orderItems.addAll(eco.getOrders().getDeliveries(owner));
-
-            shopItems.clear();
-            shopItems.addAll(eco.getShop().getDeliveries(owner));
-
-            if (page * 45 >= orderItems.size() + shopItems.size() && page > 0) {
-                page--;
-            }
-
+            refreshBackingLists();
             updatePage();
 
-            if (claimed > 0) {
+            if (dropped > 0) {
                 player.sendMessage(
-                        Text.literal("Claimed " + claimed + " deliveries.")
+                        Text.literal("Dropped " + dropped + " deliveries.")
                                 .formatted(Formatting.GREEN),
                         false
                 );
             } else {
                 player.sendMessage(
-                        Text.literal("No deliveries could be claimed.")
+                        Text.literal("No deliveries to drop.")
                                 .formatted(Formatting.RED),
                         false
                 );
             }
         }
+
         @Override
         public boolean canUse(PlayerEntity player) {
             return true;
@@ -698,6 +723,7 @@ public final class OrdersUi {
 
                         if (player.getInventory().insertStack(copy)) {
                             removeStack(stack);
+                            refreshBackingLists();
                             updatePage();
                         }
                     }
@@ -718,7 +744,7 @@ public final class OrdersUi {
                 }
 
                 if (slot == navRowStart + 8) {
-                    claimCurrentPage((ServerPlayerEntity) player);
+                    dropAllOnPage((ServerPlayerEntity) player);
                     return;
                 }
             }
@@ -735,6 +761,7 @@ public final class OrdersUi {
             if (idx < 45) {
                 if (player.getInventory().insertStack(copy)) {
                     removeStack(stack);
+                    refreshBackingLists();
                     updatePage();
                     return copy;
                 }
