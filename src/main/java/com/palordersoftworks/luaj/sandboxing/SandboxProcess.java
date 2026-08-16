@@ -1,12 +1,19 @@
 package com.palordersoftworks.luaj.sandboxing;
 
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.metadata.ModOrigin;
+import party.iroiro.luajava.luajit.LuaJit;
+
 import java.io.*;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -54,7 +61,7 @@ public final class SandboxProcess implements AutoCloseable {
         command.add("-Dfile.encoding=UTF-8");
         command.add("-Djava.awt.headless=true");
         command.add("-cp");
-        command.add(System.getProperty("java.class.path"));
+        command.add(sandboxClasspath());
         command.add("com.palordersoftworks.luaj.sandboxing.SandboxWorker");
 
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -212,6 +219,43 @@ public final class SandboxProcess implements AutoCloseable {
         }
     }
 
+    private static String sandboxClasspath() {
+        Set<String> entries = new LinkedHashSet<>();
+        addClasspathProperty(entries, System.getProperty("java.class.path", ""));
+        addCodeSource(entries, SandboxWorker.class);
+        addCodeSource(entries, LuaJit.class);
+
+        FabricLoader.getInstance()
+                .getModContainer("brokenstarsmp")
+                .map(container -> container.getOrigin())
+                .filter(origin -> origin.getKind() == ModOrigin.Kind.PATH)
+                .ifPresent(origin -> origin.getPaths().forEach(path -> entries.add(path.toString())));
+
+        return String.join(File.pathSeparator, entries);
+    }
+
+    private static void addClasspathProperty(Set<String> entries, String classpath) {
+        if (classpath == null || classpath.isBlank()) {
+            return;
+        }
+        for (String entry : classpath.split(Patterns.CLASS_PATH_SEPARATOR)) {
+            if (!entry.isBlank()) {
+                entries.add(entry);
+            }
+        }
+    }
+
+    private static void addCodeSource(Set<String> entries, Class<?> type) {
+        try {
+            if (type.getProtectionDomain() == null || type.getProtectionDomain().getCodeSource() == null) {
+                return;
+            }
+            URI location = type.getProtectionDomain().getCodeSource().getLocation().toURI();
+            entries.add(Path.of(location).toString());
+        } catch (Exception ignored) {
+        }
+    }
+
     private static String readString(DataInputStream in) throws IOException {
         int len = in.readInt();
         if (len < 0) {
@@ -237,5 +281,9 @@ public final class SandboxProcess implements AutoCloseable {
     private static boolean isWindows() {
         String os = System.getProperty("os.name", "").toLowerCase();
         return os.contains("win");
+    }
+
+    private static final class Patterns {
+        private static final String CLASS_PATH_SEPARATOR = java.util.regex.Pattern.quote(File.pathSeparator);
     }
 }
