@@ -1,10 +1,9 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -19,36 +18,35 @@ public abstract class ItemEntity_MergeMixin {
     private void mergeNearby(CallbackInfo ci) {
         if (!ServerRules.INSTANT_ITEM_MERGE) return;
 
-        ItemEntity self = (ItemEntity)(Object)this;
-        World world = self.getEntityWorld();
+        ItemEntity self = (ItemEntity) (Object) this;
+        Level level = self.level();
 
-        if (world.isClient()) return;
+        if (level.isClientSide()) return;
 
         double radius = ServerRules.ITEM_MERGE_RADIUS;
 
-        List<ItemEntity> items = world.getEntitiesByClass(
+        List<ItemEntity> items = level.getEntitiesOfClass(
                 ItemEntity.class,
-                new Box(self.getBlockPos()).expand(radius),
-                e -> e != self
+                self.getBoundingBox().inflate(radius),
+                entity -> entity != self
         );
 
         for (ItemEntity other : items) {
             if (other.isRemoved()) continue;
 
-            ItemStack a = self.getStack();
-            ItemStack b = other.getStack();
+            ItemStack a = self.getItem();
+            ItemStack b = other.getItem();
 
-            if (!ItemStack.areItemsAndComponentsEqual(a, b)) continue;
-
+            if (!ItemStack.isSameItemSameComponents(a, b)) continue;
             if (!a.isStackable()) continue;
 
-            int max = a.getMaxCount();
+            int max = a.getMaxStackSize();
             int transfer = Math.min(b.getCount(), max - a.getCount());
 
             if (transfer <= 0) continue;
 
-            a.increment(transfer);
-            b.decrement(transfer);
+            a.grow(transfer);
+            b.shrink(transfer);
 
             if (b.isEmpty()) {
                 other.discard();
