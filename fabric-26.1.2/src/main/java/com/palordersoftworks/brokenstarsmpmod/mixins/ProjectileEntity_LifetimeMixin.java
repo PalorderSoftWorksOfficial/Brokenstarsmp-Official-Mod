@@ -1,13 +1,13 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
-import net.minecraft.entity.projectile.ProjectileEntity;
+import net.minecraft.world.entity.projectile.Projectile;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ProjectileEntity.class)
+@Mixin(Projectile.class)
 public abstract class ProjectileEntity_LifetimeMixin {
 
     private int ageCustom = 0;
@@ -16,8 +16,8 @@ public abstract class ProjectileEntity_LifetimeMixin {
     private void limitLifetime(CallbackInfo ci) {
         if (ServerRules.PROJECTILE_LIFETIME < 0) return;
 
-        ProjectileEntity self = (ProjectileEntity)(Object)this;
-        if (self.getEntityWorld().isClient()) return;
+        Projectile self = (Projectile) (Object) this;
+        if (self.level().isClientSide()) return;
 
         ageCustom++;
         if (ageCustom > ServerRules.PROJECTILE_LIFETIME) {
