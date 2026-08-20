@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(MinecraftServer.class)
 public class MinecraftServer_Mixin {
 
-    @Inject(method = "getServerModName", at = @At("HEAD"), cancellable = true, remap = false)
+    @Inject(method = "getServerModName", at = @At("HEAD"), cancellable = true)
     private void brokenstarsmpmod$brand(CallbackInfoReturnable<String> cir) {
         cir.setReturnValue("PalorderCentral");
     }

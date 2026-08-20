@@ -1,25 +1,25 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ExperienceOrbEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-@Mixin(ExperienceOrbEntity.class)
+@Mixin(ExperienceOrb.class)
 public class ExperienceOrbEntity_Mixin {
 
     @Redirect(
-            method = "moveTowardsPlayer",
+            method = "followNearbyPlayer",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/world/World;getClosestPlayer(Lnet/minecraft/entity/Entity;D)Lnet/minecraft/entity/player/PlayerEntity;"
+                    target = "Lnet/minecraft/world/level/Level;getNearestPlayer(Lnet/minecraft/world/entity/Entity;D)Lnet/minecraft/world/entity/player/Player;"
             )
     )
-    private PlayerEntity brokenstarsmpmod$increaseRange(World world, Entity entity, double distance) {
-        return world.getClosestPlayer(entity, ServerRules.EXPERIENCE_ORB_RANGE);
+    private Player brokenstarsmpmod$increaseRange(Level world, Entity entity, double distance) {
+        return world.getNearestPlayer(entity, ServerRules.EXPERIENCE_ORB_RANGE);
     }
 }

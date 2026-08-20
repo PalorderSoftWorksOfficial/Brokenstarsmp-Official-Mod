@@ -1,23 +1,22 @@
 package com.palordersoftworks.brokenstarsmpmod.commands;
 
-import net.minecraft.server.PlayerConfigEntry;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-
 import java.lang.reflect.Method;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
 
 public class PermissionUtil {
     private static final String IMMORTAL_PERMISSION = "unstablesmp.immortal";
 
-    public static boolean isOwnerOrDev(ServerCommandSource source) {
-        ServerPlayerEntity player = source.getPlayer();
+    public static boolean isOwnerOrDev(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
         if (player == null) return false;
 
         return player.getName().equals("AdoreKittens");
     }
 
-    public static boolean hasImmortalPermission(ServerCommandSource source) {
-        ServerPlayerEntity player = source.getPlayer();
+    public static boolean hasImmortalPermission(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
 
         if (player == null) {
             return false;
@@ -26,17 +25,17 @@ public class PermissionUtil {
         return hasImmortalPermission(player);
     }
 
-    public static boolean hasImmortalPermission(ServerPlayerEntity player) {
-        PlayerConfigEntry entry = player.getPlayerConfigEntry();
+    public static boolean hasImmortalPermission(ServerPlayer player) {
+        NameAndId entry = player.nameAndId();
 
-        boolean fallback = player.getEntityWorld()
+        boolean fallback = player.level()
                 .getServer()
-                .getPlayerManager()
-                .isOperator(entry);
+                .getPlayerList()
+                .isOp(entry);
 
         try {
             Class<?> permissionsClass = Class.forName("me.lucko.fabric.api.permissions.v0.Permissions");
-            Method check = permissionsClass.getMethod("check", ServerPlayerEntity.class, String.class, boolean.class);
+            Method check = permissionsClass.getMethod("check", ServerPlayer.class, String.class, boolean.class);
             Object result = check.invoke(null, player, IMMORTAL_PERMISSION, fallback);
 
             if (result instanceof Boolean value) {

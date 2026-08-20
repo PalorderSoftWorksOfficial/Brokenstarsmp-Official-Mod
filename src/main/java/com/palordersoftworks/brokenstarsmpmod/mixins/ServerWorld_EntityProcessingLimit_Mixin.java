@@ -1,10 +1,6 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
-import net.minecraft.entity.Entity;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,8 +8,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Arrays;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 
-@Mixin(ServerWorld.class)
+@Mixin(ServerLevel.class)
 public abstract class ServerWorld_EntityProcessingLimit_Mixin {
 
     @Unique
@@ -25,10 +25,10 @@ public abstract class ServerWorld_EntityProcessingLimit_Mixin {
     @Unique
     private final int[] brokenstarsmpmod$slotCounts = new int[10];
 
-    @Inject(method = "tickEntity", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "tickNonPassenger", at = @At("HEAD"), cancellable = true)
     private void brokenstarsmpmod$limitEntityProcessing(Entity entity, CallbackInfo ci) {
-        ServerWorld world = (ServerWorld) (Object) this;
-        long currentTick = world.getTime();
+        ServerLevel world = (ServerLevel) (Object) this;
+        long currentTick = world.getGameTime();
 
         if (currentTick != brokenstarsmpmod$lastResetTick) {
             brokenstarsmpmod$lastResetTick = currentTick;
@@ -42,7 +42,7 @@ public abstract class ServerWorld_EntityProcessingLimit_Mixin {
             return;
         }
 
-        Identifier id = Registries.ENTITY_TYPE.getId(entity.getType());
+        Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         if (id == null) {
             brokenstarsmpmod$totalProcessedThisTick++;
             return;

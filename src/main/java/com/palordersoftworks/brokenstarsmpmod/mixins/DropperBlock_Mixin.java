@@ -1,8 +1,8 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
-import net.minecraft.block.DropperBlock;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.DropperBlock;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,10 +21,10 @@ public abstract class DropperBlock_Mixin {
     }
 
     @Redirect(
-            method = "dispense",
+            method = "dispenseFrom(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/item/ItemStack;copyWithCount(I)Lnet/minecraft/item/ItemStack;"
+                    target = "Lnet/minecraft/world/item/ItemStack;copyWithCount(I)Lnet/minecraft/world/item/ItemStack;"
             )
     )
     private ItemStack brokenstarsmpmod$copyWithCustomCount(ItemStack stack, int amount) {
@@ -32,13 +32,13 @@ public abstract class DropperBlock_Mixin {
     }
 
     @Redirect(
-            method = "dispense",
+            method = "dispenseFrom(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/item/ItemStack;decrement(I)V"
+                    target = "Lnet/minecraft/world/item/ItemStack;shrink(I)V"
             )
     )
     private void brokenstarsmpmod$decrementByCustomCount(ItemStack stack, int amount) {
-        stack.decrement(brokenstarsmpmod$getSafeAmount(stack));
+        stack.shrink(brokenstarsmpmod$getSafeAmount(stack));
     }
 }

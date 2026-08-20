@@ -5,23 +5,23 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.entity.SignBlockEntity;
-import net.minecraft.block.entity.SignText;
-import net.minecraft.command.permission.Permission;
-import net.minecraft.command.permission.PermissionLevel;
-import net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket;
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.state.property.Properties;
-import net.minecraft.text.Text;
-import net.minecraft.util.DyeColor;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -79,7 +79,7 @@ public final class TranslationProbeController {
         return runtimeEnabled && fileConfig != null && fileConfig.enabled;
     }
 
-    private static boolean isBedrockPlayer(ServerPlayerEntity player) {
+    private static boolean isBedrockPlayer(ServerPlayer player) {
         CheckHacksConfig.Bedrock bedrock = fileConfig.bedrock;
         if (bedrock == null || !bedrock.enabled || bedrock.prefixes == null) {
             return false;
@@ -93,12 +93,12 @@ public final class TranslationProbeController {
         return false;
     }
 
-    private static boolean isProbeExempt(ServerPlayerEntity player) {
+    private static boolean isProbeExempt(ServerPlayer player) {
         if (player == null) {
             return false;
         }
 
-        if (player.getCommandSource().getPermissions().hasPermission(new Permission.Level(PermissionLevel.fromLevel(2)))) {
+        if (player.createCommandSourceStack().permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2)))) {
             return true;
         }
 
@@ -113,7 +113,7 @@ public final class TranslationProbeController {
 
         try {
             LuckPerms lp = LuckPermsProvider.get();
-            User user = lp.getUserManager().getUser(player.getUuid());
+            User user = lp.getUserManager().getUser(player.getUUID());
             if (user == null) {
                 return false;
             }
@@ -135,15 +135,15 @@ public final class TranslationProbeController {
         return false;
     }
 
-    public static void onPlayerJoin(ServerPlayerEntity player, MinecraftServer server) {
+    public static void onPlayerJoin(ServerPlayer player, MinecraftServer server) {
         CheckHacksConfig cfg = fileConfig;
         if (cfg == null || !probesActive() || cfg.autoCheckOnJoin == null || !cfg.autoCheckOnJoin.enabled) {
             return;
         }
-        if (cfg.autoCheckOnJoin.onlyFirstJoin && !JOIN_CHECKED.add(player.getUuid())) {
+        if (cfg.autoCheckOnJoin.onlyFirstJoin && !JOIN_CHECKED.add(player.getUUID())) {
             return;
         }
-        JOIN_AT_TICK.put(player.getUuid(), server.getTicks() + JOIN_DELAY_TICKS);
+        JOIN_AT_TICK.put(player.getUUID(), server.getTickCount() + JOIN_DELAY_TICKS);
     }
 
     public static void clearPlayer(UUID playerId, MinecraftServer server) {
@@ -155,9 +155,9 @@ public final class TranslationProbeController {
             run.waiting = null;
         }
 
-        ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         if (player != null) {
-            player.closeHandledScreen();
+            player.closeContainer();
         }
     }
 
@@ -171,13 +171,13 @@ public final class TranslationProbeController {
     }
 
     public static void tick(MinecraftServer server) {
-        int tick = server.getTicks();
+        int tick = server.getTickCount();
 
         for (var it = JOIN_AT_TICK.entrySet().iterator(); it.hasNext(); ) {
             var e = it.next();
             if (tick >= e.getValue()) {
                 it.remove();
-                ServerPlayerEntity p = server.getPlayerManager().getPlayer(e.getKey());
+                ServerPlayer p = server.getPlayerList().getPlayer(e.getKey());
                 if (p != null) {
                     List<String> joinIds = fileConfig.resolveHackIds(fileConfig.autoCheckOnJoin.hacks);
                     startPlayerCheck(p, server, joinIds.isEmpty() ? null : joinIds);
@@ -193,8 +193,8 @@ public final class TranslationProbeController {
 
             if (run.waiting != null) {
                 if (tick == run.waiting.openSignAtTick) {
-                    ServerPlayerEntity p = server.getPlayerManager().getPlayer(id);
-                    if (p != null && p.getEntityWorld() instanceof ServerWorld world) {
+                    ServerPlayer p = server.getPlayerList().getPlayer(id);
+                    if (p != null && p.level() instanceof ServerLevel world) {
                         if (world.getBlockEntity(run.waiting.signPos) instanceof SignBlockEntity sign) {
                             TranslationProbeSignHelper.sendSignPackets(p, sign, run.waiting.signPos);
                         }
@@ -203,7 +203,7 @@ public final class TranslationProbeController {
                     handleTimeout(server, id, run);
                 }
             } else if (run.batchIndex < run.batches.size() && tick >= run.resumeAtTick) {
-                ServerPlayerEntity p = server.getPlayerManager().getPlayer(id);
+                ServerPlayer p = server.getPlayerList().getPlayer(id);
                 if (p != null) {
                     openBatch(p, server, run);
                 } else {
@@ -222,9 +222,9 @@ public final class TranslationProbeController {
         restoreCurrentBatch(server, run);
         run.waiting = null;
 
-        ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         if (player != null) {
-            player.closeHandledScreen();
+            player.closeContainer();
         }
 
         for (HackRegistryEntry hack : w.batch) {
@@ -242,8 +242,8 @@ public final class TranslationProbeController {
     /**
      * @return true if vanilla sign handling should be cancelled.
      */
-    public static boolean tryConsumeSignPacket(ServerPlayerEntity player, UpdateSignC2SPacket packet) {
-        CheckRun run = RUNS.get(player.getUuid());
+    public static boolean tryConsumeSignPacket(ServerPlayer player, ServerboundSignUpdatePacket packet) {
+        CheckRun run = RUNS.get(player.getUUID());
         if (run == null || run.waiting == null) {
             return false;
         }
@@ -255,13 +255,13 @@ public final class TranslationProbeController {
 
         run.waiting = null;
 
-        MinecraftServer server = player.getEntityWorld().getServer();
+        MinecraftServer server = player.level().getServer();
         if (server != null) {
             restoreCurrentBatch(server, run);
-            player.closeHandledScreen();
+            player.closeContainer();
         }
 
-        String[] lines = packet.getText();
+        String[] lines = packet.getLines();
         String ctrl = lines.length > 3 && lines[3] != null ? lines[3] : "";
         boolean exploitPreventer = HackProbeClassifier.isExploitPreventer(ctrl);
 
@@ -288,9 +288,9 @@ public final class TranslationProbeController {
 
         run.batchIndex++;
         if (server != null) {
-            scheduleNextBatchOrFinish(server, player.getUuid(), run);
+            scheduleNextBatchOrFinish(server, player.getUUID(), run);
         } else {
-            RUNS.remove(player.getUuid());
+            RUNS.remove(player.getUUID());
         }
 
         return true;
@@ -325,7 +325,7 @@ public final class TranslationProbeController {
         return s.length() > 120 ? s.substring(0, 120) + "…" : s;
     }
 
-    public static void startPlayerCheck(ServerPlayerEntity player, MinecraftServer server, String singleHackIdOrNull) {
+    public static void startPlayerCheck(ServerPlayer player, MinecraftServer server, String singleHackIdOrNull) {
         if (singleHackIdOrNull != null && !singleHackIdOrNull.isBlank()) {
             startPlayerCheck(player, server, List.of(singleHackIdOrNull.trim()));
             return;
@@ -333,7 +333,7 @@ public final class TranslationProbeController {
         startPlayerCheck(player, server, (List<String>) null);
     }
 
-    public static void startPlayerCheck(ServerPlayerEntity player, MinecraftServer server, List<String> hackIdsOrNull) {
+    public static void startPlayerCheck(ServerPlayer player, MinecraftServer server, List<String> hackIdsOrNull) {
         if (!probesActive()) {
             LOGGER.debug("[BrokenStarSMP/CheckHacks] skip player={} (probes off)", player.getName().getString());
             return;
@@ -349,7 +349,7 @@ public final class TranslationProbeController {
             return;
         }
 
-        if (RUNS.containsKey(player.getUuid())) {
+        if (RUNS.containsKey(player.getUUID())) {
             LOGGER.debug("[BrokenStarSMP/CheckHacks] skip player={} (run active)", player.getName().getString());
             return;
         }
@@ -382,7 +382,7 @@ public final class TranslationProbeController {
         }
 
         CheckRun run = new CheckRun(batches);
-        RUNS.put(player.getUuid(), run);
+        RUNS.put(player.getUUID(), run);
         openBatch(player, server, run);
     }
 
@@ -401,15 +401,15 @@ public final class TranslationProbeController {
         return batches;
     }
 
-    private static void openBatch(ServerPlayerEntity player, MinecraftServer server, CheckRun run) {
+    private static void openBatch(ServerPlayer player, MinecraftServer server, CheckRun run) {
         if (run.batchIndex >= run.batches.size()) {
-            finishCheck(server, player.getUuid(), run);
+            finishCheck(server, player.getUUID(), run);
             return;
         }
 
         List<HackRegistryEntry> batch = run.batches.get(run.batchIndex);
-        if (!(player.getEntityWorld() instanceof ServerWorld world)) {
-            RUNS.remove(player.getUuid());
+        if (!(player.level() instanceof ServerLevel world)) {
+            RUNS.remove(player.getUUID());
             return;
         }
 
@@ -419,58 +419,58 @@ public final class TranslationProbeController {
                 run.results.put(hack.id, HackProbeResultState.SKIPPED);
             }
             run.batchIndex++;
-            run.resumeAtTick = server.getTicks() + Math.max(1, fileConfig.betweenSignTicks);
+            run.resumeAtTick = server.getTickCount() + Math.max(1, fileConfig.betweenSignTicks);
             LOGGER.warn("[BrokenStarSMP/CheckHacks] no air near player={}", player.getName().getString());
             return;
         }
 
-        BlockPos supportPos = signPos.down();
+        BlockPos supportPos = signPos.below();
         BlockState previousSignState = world.getBlockState(signPos);
         BlockState previousSupportState = world.getBlockState(supportPos);
         boolean placedBarrier = world.getBlockState(supportPos).isAir();
 
-        if (placedBarrier && !world.setBlockState(supportPos, Blocks.BARRIER.getDefaultState(), 3)) {
+        if (placedBarrier && !world.setBlock(supportPos, Blocks.BARRIER.defaultBlockState(), 3)) {
             deferBatch(server, run);
             return;
         }
 
-        float yaw = MathHelper.wrapDegrees(player.getYaw());
+        float yaw = Mth.wrapDegrees(player.getYRot());
         int rotation = (int) Math.floor((yaw + 180.0F) * 16.0F / 360.0F) & 15;
-        BlockState signState = Blocks.OAK_SIGN.getDefaultState().with(Properties.ROTATION, rotation);
-        if (!world.setBlockState(signPos, signState, 3)) {
+        BlockState signState = Blocks.OAK_SIGN.defaultBlockState().setValue(BlockStateProperties.ROTATION_16, rotation);
+        if (!world.setBlock(signPos, signState, 3)) {
             if (placedBarrier) {
-                world.setBlockState(supportPos, previousSupportState, 3);
+                world.setBlock(supportPos, previousSupportState, 3);
             }
             deferBatch(server, run);
             return;
         }
 
         if (!(world.getBlockEntity(signPos) instanceof SignBlockEntity sign)) {
-            world.setBlockState(signPos, previousSignState, 3);
+            world.setBlock(signPos, previousSignState, 3);
             if (placedBarrier) {
-                world.setBlockState(supportPos, previousSupportState, 3);
+                world.setBlock(supportPos, previousSupportState, 3);
             }
             deferBatch(server, run);
             return;
         }
 
-        Text[] front = new Text[4];
-        Text[] back = new Text[4];
+        Component[] front = new Component[4];
+        Component[] back = new Component[4];
         for (int i = 0; i < LINES_PER_SIGN; i++) {
-            Text line = i < batch.size() ? probeLine(batch.get(i)) : Text.empty();
+            Component line = i < batch.size() ? probeLine(batch.get(i)) : Component.empty();
             front[i] = line;
             back[i] = line;
         }
-        Text control = Text.keybind(HackProbeClassifier.CONTROL_KEYBIND);
+        Component control = Component.keybind(HackProbeClassifier.CONTROL_KEYBIND);
         front[3] = control;
         back[3] = control;
 
         SignText signText = new SignText(front, back, DyeColor.BLACK, false);
         sign.setText(signText, true);
-        sign.setEditor(player.getUuid());
-        sign.markDirty();
+        sign.setAllowedPlayerEditor(player.getUUID());
+        sign.setChanged();
 
-        int start = server.getTicks();
+        int start = server.getTickCount();
         int deadline = start + Math.max(20, fileConfig.timeoutTicks);
 
         run.waiting = new WaitingBatch(
@@ -483,7 +483,7 @@ public final class TranslationProbeController {
                 start,
                 deadline,
                 start + OPEN_SIGN_DELAY_TICKS,
-                world.getRegistryKey()
+                world.dimension()
         );
 
         LOGGER.info("[BrokenStarSMP/CheckHacks] batch start player={} hacks={} pos={}",
@@ -492,20 +492,20 @@ public final class TranslationProbeController {
                 signPos.toShortString());
     }
 
-    private static Text probeLine(HackRegistryEntry entry) {
+    private static Component probeLine(HackRegistryEntry entry) {
         String key = entry.key == null ? "" : entry.key;
         return switch (entry.mode) {
-            case METEOR, TRANSLATE -> Text.translatableWithFallback(key, entry.fallback());
-            case KEYBIND -> Text.keybind(key);
+            case METEOR, TRANSLATE -> Component.translatableWithFallback(key, entry.fallback());
+            case KEYBIND -> Component.keybind(key);
         };
     }
 
     private static void deferBatch(MinecraftServer server, CheckRun run) {
-        run.resumeAtTick = server.getTicks() + 20;
+        run.resumeAtTick = server.getTickCount() + 20;
     }
 
     private static void dispatchResult(
-            ServerPlayerEntity player,
+            ServerPlayer player,
             CheckRun run,
             HackRegistryEntry hack,
             HackProbeResultState state,
@@ -517,7 +517,7 @@ public final class TranslationProbeController {
             return;
         }
         HackProbeResult res = new HackProbeResult(
-                player.getUuid(),
+                player.getUUID(),
                 player.getName().getString(),
                 hack.id,
                 hack.key,
@@ -527,7 +527,7 @@ public final class TranslationProbeController {
                 w.deadlineTick,
                 line,
                 detail,
-                w.signPos.toImmutable(),
+                w.signPos.immutable(),
                 new String[0]
         );
         TranslationProbeHooks.dispatch(res);
@@ -538,16 +538,16 @@ public final class TranslationProbeController {
             finishCheck(server, playerId, run);
             return;
         }
-        run.resumeAtTick = server.getTicks() + Math.max(1, fileConfig.betweenSignTicks);
+        run.resumeAtTick = server.getTickCount() + Math.max(1, fileConfig.betweenSignTicks);
     }
 
     private static void finishCheck(MinecraftServer server, UUID playerId, CheckRun run) {
         RUNS.remove(playerId);
-        ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         maybeRunAggregateCommands(server, player, run);
     }
 
-    private static void maybeRunAggregateCommands(MinecraftServer server, ServerPlayerEntity player, CheckRun run) {
+    private static void maybeRunAggregateCommands(MinecraftServer server, ServerPlayer player, CheckRun run) {
         if (player == null) {
             return;
         }
@@ -587,10 +587,10 @@ public final class TranslationProbeController {
         }
     }
 
-    private static void runCommand(MinecraftServer server, String cmd, ServerPlayerEntity player, String kind) {
+    private static void runCommand(MinecraftServer server, String cmd, ServerPlayer player, String kind) {
         LOGGER.info("[BrokenStarSMP/CheckHacks] exec player={} kind={} cmd={}",
                 player.getName().getString(), kind, cmd);
-        server.getCommandManager().parseAndExecute(server.getCommandSource().withSilent(), cmd);
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), cmd);
     }
 
     private static void restoreCurrentBatch(MinecraftServer server, CheckRun run) {
@@ -598,11 +598,11 @@ public final class TranslationProbeController {
         if (w == null) {
             return;
         }
-        ServerWorld world = server.getWorld(w.worldKey);
+        ServerLevel world = server.getLevel(w.worldKey);
         if (world != null) {
-            world.setBlockState(w.signPos, w.previousSignState, 3);
+            world.setBlock(w.signPos, w.previousSignState, 3);
             if (w.placedBarrier) {
-                world.setBlockState(w.supportPos, w.previousSupportState, 3);
+                world.setBlock(w.supportPos, w.previousSupportState, 3);
             }
         }
     }
@@ -631,7 +631,7 @@ public final class TranslationProbeController {
         final int startTick;
         final int deadlineTick;
         final int openSignAtTick;
-        final RegistryKey<World> worldKey;
+        final ResourceKey<Level> worldKey;
 
         WaitingBatch(
                 List<HackRegistryEntry> batch,
@@ -643,11 +643,11 @@ public final class TranslationProbeController {
                 int startTick,
                 int deadlineTick,
                 int openSignAtTick,
-                RegistryKey<World> worldKey
+                ResourceKey<Level> worldKey
         ) {
             this.batch = batch;
-            this.signPos = signPos.toImmutable();
-            this.supportPos = supportPos.toImmutable();
+            this.signPos = signPos.immutable();
+            this.supportPos = supportPos.immutable();
             this.previousSignState = previousSignState;
             this.previousSupportState = previousSupportState;
             this.placedBarrier = placedBarrier;

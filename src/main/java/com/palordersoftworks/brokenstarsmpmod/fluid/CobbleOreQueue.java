@@ -1,20 +1,19 @@
 package com.palordersoftworks.brokenstarsmpmod.fluid;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-
 import java.util.ArrayDeque;
 import java.util.Queue;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 
 public final class CobbleOreQueue {
     private CobbleOreQueue() {}
 
-    private record Entry(World world, BlockPos pos) {}
+    private record Entry(Level world, BlockPos pos) {}
 
     private static final Queue<Entry> QUEUE = new ArrayDeque<>();
 
-    public static void enqueue(World world, BlockPos pos) {
-        QUEUE.add(new Entry(world, pos.toImmutable()));
+    public static void enqueue(Level world, BlockPos pos) {
+        QUEUE.add(new Entry(world, pos.immutable()));
     }
 
     public static void process() {

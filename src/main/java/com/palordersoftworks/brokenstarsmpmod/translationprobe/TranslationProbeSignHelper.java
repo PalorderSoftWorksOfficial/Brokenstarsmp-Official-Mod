@@ -1,15 +1,15 @@
 package com.palordersoftworks.brokenstarsmpmod.translationprobe;
 
 import com.mojang.logging.LogUtils;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.entity.SignBlockEntity;
-import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.SignEditorOpenS2CPacket;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundOpenSignEditorPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import org.slf4j.Logger;
 
 /**
@@ -20,9 +20,9 @@ public final class TranslationProbeSignHelper {
 
     private TranslationProbeSignHelper() {}
 
-    public static BlockPos findAirNear(ServerPlayerEntity player) {
-        BlockPos base = player.getBlockPos();
-        ServerWorld world = (ServerWorld) player.getEntityWorld();
+    public static BlockPos findAirNear(ServerPlayer player) {
+        BlockPos base = player.blockPosition();
+        ServerLevel world = (ServerLevel) player.level();
         int[][] offsets = {
                 {0, 1, 0}, {0, 2, 0}, {0, 3, 0}, {0, 4, 0}, {0, 5, 0},
                 {1, 1, 0}, {-1, 1, 0}, {0, 1, 1}, {0, 1, -1},
@@ -30,24 +30,24 @@ public final class TranslationProbeSignHelper {
                 {2, 1, 0}, {-2, 1, 0}, {0, 1, 2}, {0, 1, -2},
         };
         for (int[] offset : offsets) {
-            BlockPos pos = base.add(offset[0], offset[1], offset[2]);
+            BlockPos pos = base.offset(offset[0], offset[1], offset[2]);
             if (world.getBlockState(pos).isAir()) {
-                return pos.toImmutable();
+                return pos.immutable();
             }
         }
         return null;
     }
 
-    public static void sendSignPackets(ServerPlayerEntity player, SignBlockEntity sign, BlockPos signPos) {
+    public static void sendSignPackets(ServerPlayer player, SignBlockEntity sign, BlockPos signPos) {
         try {
-            player.networkHandler.sendPacket(BlockEntityUpdateS2CPacket.create(sign));
-            player.networkHandler.sendPacket(new SignEditorOpenS2CPacket(signPos, true));
-            BlockState air = Blocks.AIR.getDefaultState();
-            player.networkHandler.sendPacket(new BlockUpdateS2CPacket(signPos, air));
+            player.connection.send(ClientboundBlockEntityDataPacket.create(sign));
+            player.connection.send(new ClientboundOpenSignEditorPacket(signPos, true));
+            BlockState air = Blocks.AIR.defaultBlockState();
+            player.connection.send(new ClientboundBlockUpdatePacket(signPos, air));
         } catch (Exception e) {
             LOGGER.warn("[BrokenStarSMP/CheckHacks] sign packet send failed for {}: {}",
                     player.getName().getString(), e.getMessage());
-            player.openEditSignScreen(sign, true);
+            player.openTextEdit(sign, true);
         }
     }
 }

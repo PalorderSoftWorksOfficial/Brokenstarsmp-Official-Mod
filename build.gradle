@@ -9,7 +9,7 @@ buildscript {
 }
 
 plugins {
-    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'maven-publish'
     id 'org.jetbrains.kotlin.jvm' version '2.3.10'
     id("com.gradleup.shadow") version "9.4.1"
@@ -38,6 +38,17 @@ repositories {
         name = 'squiddev repository'
         url = 'https://maven.squiddev.cc/'
     }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 configurations {
@@ -47,33 +58,25 @@ configurations {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
-    modImplementation "eu.pb4:placeholder-api:2.8.2+1.21.10"
-    modImplementation include("eu.pb4:sgui:1.12.0+1.21.11")
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    implementation "eu.pb4:placeholder-api:3.1.0-beta.1+26.2"
+    implementation include("eu.pb4:sgui:2.1.0+26.2")
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4")
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.4"
     compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.4"
 
-    compileOnly "cc.tweaked:cc-tweaked-1.21.11-core-api:1.117.1"
-    compileOnly "cc.tweaked:cc-tweaked-1.21.11-common-api:1.117.1"
-    implementation "cc.tweaked:cc-tweaked-1.21.11-fabric:1.117.1"
-    implementation "cc.tweaked:cc-tweaked-1.21.11-fabric-api:1.117.1"
-
-    modImplementation "net.fabricmc:fabric-language-kotlin:1.13.9+"
+    implementation "net.fabricmc:fabric-language-kotlin:1.13.9+"
     // Polymer dependencies
-    modImplementation include("eu.pb4:polymer-core:0.15.2+1.21.11")
-    modImplementation include("eu.pb4:polymer-blocks:0.15.2+1.21.11")
-    modImplementation include("eu.pb4:polymer-resource-pack:0.15.2+1.21.11")
-    modImplementation include("eu.pb4:polymer-virtual-entity:0.15.2+1.21.11")
-    modImplementation include("eu.pb4:polymer-networking:0.15.2+1.21.11")
-
-
+    implementation include("eu.pb4:polymer-core:0.17.3+26.2")
+    implementation include("eu.pb4:polymer-blocks:0.17.3+26.2")
+    implementation include("eu.pb4:polymer-resource-pack:0.17.3+26.2")
+    implementation include("eu.pb4:polymer-virtual-entity:0.17.3+26.2")
+    implementation include("eu.pb4:polymer-networking:0.17.3+26.2")
 
     // Dev runtime visibility
-    modLocalRuntime "party.iroiro.luajava:luajit:4.1.0"
-    modLocalRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
+    localRuntime "party.iroiro.luajava:luajit:4.1.0"
+    localRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
     // Compile-time access
     compileOnly "party.iroiro.luajava:luajit:4.1.0"
@@ -83,8 +86,12 @@ dependencies {
     luaShadow "party.iroiro.luajava:luajit:4.1.0"
     luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
-    modCompileOnly(files("libs/essential_commands-0.38.6-mc1.21.11.jar"))
     compileOnly 'net.luckperms:api:5.4'
+
+    // EconomyCraft (Modrinth) — compile against it; do not shade into this mod
+    compileOnly "maven.modrinth:H4o5bO7g:HnyvUyL6"
+    localRuntime "maven.modrinth:H4o5bO7g:HnyvUyL6"
+    localRuntime "maven.modrinth:lhGA9TYQ:1yQC4VvP"
 }
 
 processResources {
@@ -99,24 +106,29 @@ loom {
     accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
 }
 
-tasks.withType(JavaCompile) {
+tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
+    options.release = 25
+}
+
+tasks.named("jar") {
+    enabled = false
 }
 
 tasks.named("shadowJar") {
-    archiveClassifier.set("shadow")
+    archiveClassifier.set("")
     configurations = [project.configurations.luaShadow, project.configurations.Shadow]
 }
 
-tasks.named("remapJar") {
-    dependsOn tasks.named("shadowJar")
-    inputFile.set(tasks.named("shadowJar").flatMap { it.archiveFile })
+tasks.named("build") {
+    dependsOn tasks.named("shadowJar"), "sourcesJar", "javadocJar"
 }
+
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
+
 def bumpVersionLogic = { type ->
     if (!["major", "minor", "patch"].contains(type)) {
         throw new GradleException("Unknown version type: $type")
@@ -174,10 +186,6 @@ tasks.register("bumpVersion") {
     }
 }
 
-tasks.named("build") {
-    dependsOn("sourcesJar", "javadocJar")
-}
-
 tasks.named("publish") {
     dependsOn("sourcesJar", "javadocJar")
 }
@@ -204,8 +212,8 @@ publishing {
             artifactId = archives_base_name
             version = project.version
 
-            artifact(tasks.named("remapJar")) {
-                builtBy tasks.named("remapJar")
+            artifact(tasks.named("shadowJar")) {
+                builtBy tasks.named("shadowJar")
             }
             artifact(tasks.named("sourcesJar"))
             artifact(tasks.named("javadocJar"))

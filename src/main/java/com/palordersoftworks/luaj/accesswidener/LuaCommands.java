@@ -1,58 +1,58 @@
 package com.palordersoftworks.luaj.accesswidener;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.palordersoftworks.economycraft.util.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 
 public final class LuaCommands {
     private static final LuaScriptManager LUA = new LuaScriptManager();
 
-    private static ScriptHost host(ServerCommandSource source) {
+    private static ScriptHost host(CommandSourceStack source) {
         return new ScriptHost(
-                msg -> source.sendMessage(Text.literal(msg)),
-                msg -> source.sendError(Text.literal(msg))
+                msg -> source.sendSystemMessage(Component.literal(msg)),
+                msg -> source.sendFailure(Component.literal(msg))
         );
     }
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(CommandManager.literal("lua")
+            dispatcher.register(Commands.literal("lua")
                     .requires(source -> PermissionCompat.gamemaster().test(source))
-                    .then(CommandManager.literal("reload").executes(ctx -> {
+                    .then(Commands.literal("reload").executes(ctx -> {
                         LUA.reloadAll();
                         return 1;
                     }))
-                    .then(CommandManager.literal("load")
-                            .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                    .then(Commands.literal("load")
+                            .then(Commands.argument("script", StringArgumentType.word()).executes(ctx -> {
                                 String script = StringArgumentType.getString(ctx, "script");
                                 return LUA.load(script, host(ctx.getSource())) ? 1 : 0;
                             })))
-                    .then(CommandManager.literal("unload")
-                            .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                    .then(Commands.literal("unload")
+                            .then(Commands.argument("script", StringArgumentType.word()).executes(ctx -> {
                                 String script = StringArgumentType.getString(ctx, "script");
                                 return LUA.stop(script) ? 1 : 0;
                             })))
-                    .then(CommandManager.literal("run")
-                            .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                    .then(Commands.literal("run")
+                            .then(Commands.argument("script", StringArgumentType.word()).executes(ctx -> {
                                 String script = StringArgumentType.getString(ctx, "script");
                                 return LUA.run(script, host(ctx.getSource())) ? 1 : 0;
                             })))
-                    .then(CommandManager.literal("stop")
-                            .then(CommandManager.argument("script", StringArgumentType.word()).executes(ctx -> {
+                    .then(Commands.literal("stop")
+                            .then(Commands.argument("script", StringArgumentType.word()).executes(ctx -> {
                                 String script = StringArgumentType.getString(ctx, "script");
                                 return LUA.stop(script) ? 1 : 0;
                             })))
-                    .then(CommandManager.literal("runCode")
-                            .then(CommandManager.argument("code", StringArgumentType.greedyString()).executes(ctx -> {
+                    .then(Commands.literal("runCode")
+                            .then(Commands.argument("code", StringArgumentType.greedyString()).executes(ctx -> {
                                 String code = StringArgumentType.getString(ctx, "code");
                                 return LUA.runCode(code, host(ctx.getSource())) ? 1 : 0;
                             })))
-                    .then(CommandManager.literal("io")
-                            .then(CommandManager.argument("script", StringArgumentType.word())
-                                    .then(CommandManager.argument("input", StringArgumentType.greedyString()).executes(ctx -> {
+                    .then(Commands.literal("io")
+                            .then(Commands.argument("script", StringArgumentType.word())
+                                    .then(Commands.argument("input", StringArgumentType.greedyString()).executes(ctx -> {
                                         String script = StringArgumentType.getString(ctx, "script");
                                         String input = StringArgumentType.getString(ctx, "input");
                                         return LUA.pushInput(script, input) ? 1 : 0;

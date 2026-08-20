@@ -1,12 +1,11 @@
 package com.palordersoftworks.brokenstarsmpmod.fluid;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-
 import java.util.concurrent.ThreadLocalRandom;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 
 public final class CobbleOreProcessor {
     private CobbleOreProcessor() {}
@@ -32,15 +31,15 @@ public final class CobbleOreProcessor {
             Blocks.NETHER_GOLD_ORE
     };
 
-    public static void process(net.minecraft.world.World world, BlockPos pos) {
+    public static void process(net.minecraft.world.level.Level world, BlockPos pos) {
         if (!ServerRules.RANDOM_ORE_COBBLESTONE) return;
-        if (!(world instanceof ServerWorld serverWorld)) return;
-        if (!serverWorld.isChunkLoaded(pos)) return;
+        if (!(world instanceof ServerLevel serverWorld)) return;
+        if (!serverWorld.hasChunkAt(pos)) return;
 
         Block current = serverWorld.getBlockState(pos).getBlock();
         if (current != Blocks.COBBLESTONE && current != Blocks.STONE) return;
 
         Block ore = ORE_POOL[ThreadLocalRandom.current().nextInt(ORE_POOL.length)];
-        serverWorld.setBlockState(pos, ore.getDefaultState(), 3);
+        serverWorld.setBlock(pos, ore.defaultBlockState(), 3);
     }
 }

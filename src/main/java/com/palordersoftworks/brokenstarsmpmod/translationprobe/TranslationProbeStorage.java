@@ -22,7 +22,7 @@ public final class TranslationProbeStorage {
     private TranslationProbeStorage() {}
 
     public static Path configPath(MinecraftServer server) {
-        return server.getRunDirectory().resolve("config").resolve("brokenstarsmp").resolve("translation_probe_config.json");
+        return server.getServerDirectory().resolve("config").resolve("brokenstarsmp").resolve("translation_probe_config.json");
     }
 
     public static CheckHacksConfig load(MinecraftServer server) {

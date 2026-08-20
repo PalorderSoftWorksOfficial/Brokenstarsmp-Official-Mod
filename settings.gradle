@@ -33,9 +33,9 @@ pluginManagement {
     }
 }
 include(
-        "fabric-template",
+        //"fabric-template",
         //"fabric-26.1.2",
-        "paper",
-        "spigot",
+        //"paper",
+        //"spigot",
 )
 includeBuild("quilt-1.21.11")

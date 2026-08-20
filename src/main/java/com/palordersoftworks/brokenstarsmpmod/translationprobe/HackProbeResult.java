@@ -1,8 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.translationprobe;
 
-import net.minecraft.util.math.BlockPos;
-
 import java.util.UUID;
+import net.minecraft.core.BlockPos;
 
 /**
  * Outcome of one hack probe (one sign interaction).

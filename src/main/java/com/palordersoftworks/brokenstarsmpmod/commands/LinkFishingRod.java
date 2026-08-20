@@ -1,44 +1,44 @@
 package com.palordersoftworks.brokenstarsmpmod.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.NbtComponent;
-import net.minecraft.item.FishingRodItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.PlayerConfigEntry;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.world.item.FishingRodItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 
 public class LinkFishingRod {
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess, CommandManager.RegistrationEnvironment environment) {
-        dispatcher.register(CommandManager.literal("linkfrod")
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.CommandSelection environment) {
+        dispatcher.register(Commands.literal("linkfrod")
                 .requires(source -> {
-                    ServerPlayerEntity player = source.getPlayer();
+                    ServerPlayer player = source.getPlayer();
                     if (player == null) return false;
 
-                    PlayerConfigEntry entry = player.getPlayerConfigEntry();
+                    NameAndId entry = player.nameAndId();
 
-                    return player.getEntityWorld()
+                    return player.level()
                             .getServer()
-                            .getPlayerManager()
-                            .isOperator(entry);
+                            .getPlayerList()
+                            .isOp(entry);
                 })
                 .executes(context -> {
-                    ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
-                    ItemStack stack = player.getMainHandStack();
+                    ServerPlayer player = context.getSource().getPlayerOrException();
+                    ItemStack stack = player.getMainHandItem();
 
                     if (!(stack.getItem() instanceof FishingRodItem)) return 0;
 
-                    NbtComponent.set(DataComponentTypes.CUSTOM_DATA, stack, nbt -> {
+                    CustomData.update(DataComponents.CUSTOM_DATA, stack, nbt -> {
                         nbt.putString("RodType", "void");
-                        nbt.putString("Voidrodowner", player.getUuidAsString());
+                        nbt.putString("Voidrodowner", player.getStringUUID());
                         nbt.putInt("RodUse", 0);
                     });
 
-                    stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Stasis rod"));
+                    stack.set(DataComponents.CUSTOM_NAME, Component.literal("Stasis rod"));
                     return 1;
                 }));
     }

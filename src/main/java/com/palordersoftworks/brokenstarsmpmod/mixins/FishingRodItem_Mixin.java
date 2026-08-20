@@ -1,17 +1,17 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.initiaters.DropAtFeet;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.NbtComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.FishingBobberEntity;
-import net.minecraft.item.FishingRodItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.world.World;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.FishingHook;
+import net.minecraft.world.item.FishingRodItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,40 +25,40 @@ import static com.palordersoftworks.brokenstarsmpmod.initiaters.DropAtFeet.serve
 public abstract class FishingRodItem_Mixin {
 
     @Inject(
-            method = "use",
+            method = "use(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/InteractionHand;)Lnet/minecraft/world/InteractionResult;",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/entity/projectile/FishingBobberEntity;use(Lnet/minecraft/item/ItemStack;)I"
+                    target = "Lnet/minecraft/world/entity/projectile/FishingHook;retrieve(Lnet/minecraft/world/item/ItemStack;)I"
             )
     )
     private void brokenstarsmp$stasis(
-            World world,
-            net.minecraft.entity.player.PlayerEntity user,
-            Hand hand,
-            CallbackInfoReturnable<ActionResult> cir
+            Level world,
+            net.minecraft.world.entity.player.Player user,
+            InteractionHand hand,
+            CallbackInfoReturnable<InteractionResult> cir
     ) {
-        if (world.isClient()) return;
-        if (!(user instanceof ServerPlayerEntity serverPlayer)) return;
+        if (world.isClientSide()) return;
+        if (!(user instanceof ServerPlayer serverPlayer)) return;
 
-        ItemStack stack = user.getStackInHand(hand);
-        NbtComponent customData = stack.get(DataComponentTypes.CUSTOM_DATA);
+        ItemStack stack = user.getItemInHand(hand);
+        CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
         if (customData == null) return;
 
-        NbtCompound nbt = customData.copyNbt();
-        if (!"void".equals(nbt.getString("RodType", ""))) return;
+        CompoundTag nbt = customData.copyTag();
+        if (!"void".equals(nbt.getStringOr("RodType", ""))) return;
 
-        String owner = nbt.getString("Voidrodowner", "");
-        boolean linkedOwner = serverPlayer.getUuidAsString().equals(owner);
+        String owner = nbt.getStringOr("Voidrodowner", "");
+        boolean linkedOwner = serverPlayer.getStringUUID().equals(owner);
 
         if (!linkedOwner) {
             voidEntity(serverPlayer);
             return;
         }
 
-        FishingBobberEntity hook = serverPlayer.fishHook;
+        FishingHook hook = serverPlayer.fishing;
         if (hook == null) return;
 
-        Entity hooked = hook.getHookedEntity();
+        Entity hooked = hook.getHookedIn();
         if (hooked == null) return;
 
         runLater(1, () -> voidEntity(hooked));
@@ -66,7 +66,7 @@ public abstract class FishingRodItem_Mixin {
 
     @Unique
     private static void voidEntity(Entity entity) {
-        entity.requestTeleport(entity.getX(), -70.0, entity.getZ());
+        entity.teleportTo(entity.getX(), -70.0, entity.getZ());
     }
     @Unique
     private static void runLater(int delayTicks, Runnable action) {

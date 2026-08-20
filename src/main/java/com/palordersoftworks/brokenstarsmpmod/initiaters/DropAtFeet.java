@@ -9,35 +9,30 @@ import com.palordersoftworks.brokenstarsmpmod.config.UnstableSMPRules;
 import com.palordersoftworks.brokenstarsmpmod.fluid.CobbleOreQueue;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeCommands;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeController;
+import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtras;
 import com.palordersoftworks.brokenstarsmpmod.unstablesmp.UnstableSMPFeatures;
-import com.palordersoftworks.economycraft.EconomyCraft;
-import com.palordersoftworks.economycraft.wand.SellWand;
 import com.palordersoftworks.luaj.accesswidener.LuaCommands;
 import com.palordersoftworks.luaj.accesswidener.LuaScriptManager;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.NbtComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.FishingBobberEntity;
-import net.minecraft.item.FishingRodItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ActionResult;
-
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Relative;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.FishingHook;
+import net.minecraft.world.item.FishingRodItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -55,7 +50,7 @@ public class DropAtFeet implements ModInitializer {
     @Override
     public void onInitialize() {
 
-        ServerTickEvents.END_WORLD_TICK.register(world -> CobbleOreQueue.process());
+        ServerTickEvents.END_LEVEL_TICK.register(world -> CobbleOreQueue.process());
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             serverTick++;
@@ -106,7 +101,7 @@ public class DropAtFeet implements ModInitializer {
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
                 TranslationProbeController.clearPlayer(
-                        handler.player.getUuid(),
+                        handler.player.getUUID(),
                         server
                 )
         );
@@ -118,9 +113,9 @@ public class DropAtFeet implements ModInitializer {
 
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
 
-            if (!(entity instanceof net.minecraft.entity.ItemEntity item)) return;
+            if (!(entity instanceof net.minecraft.world.entity.item.ItemEntity item)) return;
 
-            if (!(world instanceof ServerWorld serverWorld)) return;
+            if (!(world instanceof ServerLevel serverWorld)) return;
 
 
             double ix = item.getX();
@@ -130,7 +125,7 @@ public class DropAtFeet implements ModInitializer {
             int r = DROP_AT_FEET_RADIUS;
 
 
-            for (PlayerEntity player : serverWorld.getPlayers()) {
+            for (Player player : serverWorld.players()) {
 
                 double dx = Math.abs(player.getX() - ix);
                 double dy = Math.abs(player.getY() - iy);
@@ -139,13 +134,13 @@ public class DropAtFeet implements ModInitializer {
 
                 if (dx <= r && dy <= r && dz <= r) {
 
-                    item.updatePosition(
+                    item.absSnapTo(
                             player.getX(),
                             player.getY(),
                             player.getZ()
                     );
 
-                    item.setVelocity(
+                    item.setDeltaMovement(
                             0,
                             0,
                             0
@@ -158,118 +153,64 @@ public class DropAtFeet implements ModInitializer {
 
 
 
-        EconomyCraft.registerEvents();
-
-
-
-        ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
-
-            if (!(entity instanceof ServerPlayerEntity victim)) return;
-
-
-            LivingEntity attacker = victim.getAttacker();
-
-
-            if (attacker instanceof ServerPlayerEntity killer) {
-
-                EconomyCraft.getManager(
-                        victim.getEntityWorld().getServer()
-                ).handlePvpKill(
-                        victim,
-                        killer
-                );
-            }
-        });
-
-
-
-        registerSellWand();
-
         registerVoidRod();
 
 
 
+        EconomyExtras.register();
         LuaCommands.register();
     }
-    private static void registerSellWand() {
-
-        UseItemCallback.EVENT.register((player, world, hand) -> {
-
-            ItemStack stack = player.getStackInHand(hand);
-
-
-            if (!SellWand.isSellWand(stack)) {
-                return ActionResult.PASS;
-            }
-
-
-            if (!world.isClient() && player instanceof ServerPlayerEntity serverPlayer) {
-
-                int sold = SellWand.useOnTargetContainer(serverPlayer);
-
-                return sold > 0
-                        ? ActionResult.SUCCESS
-                        : ActionResult.PASS;
-            }
-
-
-            return ActionResult.SUCCESS;
-        });
-    }
-
-
-
     private static void registerVoidRod() {
 
         UseItemCallback.EVENT.register((player, world, hand) -> {
 
-            if (world.isClient()) {
-                return ActionResult.PASS;
+            if (world.isClientSide()) {
+                return InteractionResult.PASS;
             }
 
 
-            if (!(player instanceof ServerPlayerEntity serverPlayer)) {
-                return ActionResult.PASS;
+            if (!(player instanceof ServerPlayer serverPlayer)) {
+                return InteractionResult.PASS;
             }
 
 
-            ItemStack stack = player.getStackInHand(hand);
+            ItemStack stack = player.getItemInHand(hand);
 
 
             if (!(stack.getItem() instanceof FishingRodItem)) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
-            NbtComponent customData =
-                    stack.get(DataComponentTypes.CUSTOM_DATA);
+            CustomData customData =
+                    stack.get(DataComponents.CUSTOM_DATA);
 
 
             if (customData == null || customData.isEmpty()) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
-            NbtCompound nbt = customData.copyNbt();
+            CompoundTag nbt = customData.copyTag();
 
 
             if (!"void".equals(
                     nbt.getString("RodType")
             )) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
-            if (!serverPlayer.getUuidAsString().equals(
+            if (!serverPlayer.getStringUUID().equals(
                     nbt.getString("Voidrodowner")
             )) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
 
             int rodUse =
-                    nbt.getInt("RodUse", 0) + 1;
+                    nbt.getIntOr("RodUse", 0) + 1;
 
 
             nbt.putInt(
@@ -278,8 +219,8 @@ public class DropAtFeet implements ModInitializer {
             );
 
 
-            NbtComponent.set(
-                    DataComponentTypes.CUSTOM_DATA,
+            CustomData.set(
+                    DataComponents.CUSTOM_DATA,
                     stack,
                     nbt
             );
@@ -296,11 +237,11 @@ public class DropAtFeet implements ModInitializer {
 
 
                     ItemStack held =
-                            serverPlayer.getStackInHand(hand);
+                            serverPlayer.getItemInHand(hand);
 
 
-                    NbtComponent heldData =
-                            held.get(DataComponentTypes.CUSTOM_DATA);
+                    CustomData heldData =
+                            held.get(DataComponents.CUSTOM_DATA);
 
 
                     if (heldData == null || heldData.isEmpty()) {
@@ -308,8 +249,8 @@ public class DropAtFeet implements ModInitializer {
                     }
 
 
-                    NbtCompound heldNbt =
-                            heldData.copyNbt();
+                    CompoundTag heldNbt =
+                            heldData.copyTag();
 
 
                     if (!"void".equals(
@@ -319,7 +260,7 @@ public class DropAtFeet implements ModInitializer {
                     }
 
 
-                    if (!serverPlayer.getUuidAsString().equals(
+                    if (!serverPlayer.getStringUUID().equals(
                             heldNbt.getString("Voidrodowner")
                     )) {
                         return;
@@ -332,27 +273,27 @@ public class DropAtFeet implements ModInitializer {
                     );
 
 
-                    NbtComponent.set(
-                            DataComponentTypes.CUSTOM_DATA,
+                    CustomData.set(
+                            DataComponents.CUSTOM_DATA,
                             held,
                             heldNbt
                     );
                 });
 
 
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
 
             if (rodUse < 2) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
 
-            FishingBobberEntity hook =
-                    serverPlayer.fishHook;
+            FishingHook hook =
+                    serverPlayer.fishing;
 
 
             if (hook == null) {
@@ -362,36 +303,36 @@ public class DropAtFeet implements ModInitializer {
                         0
                 );
 
-                NbtComponent.set(
-                        DataComponentTypes.CUSTOM_DATA,
+                CustomData.set(
+                        DataComponents.CUSTOM_DATA,
                         stack,
                         nbt
                 );
 
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
 
             Entity hooked =
-                    hook.getHookedEntity();
+                    hook.getHookedIn();
 
 
 
-            if (!(hooked instanceof ServerPlayerEntity target)) {
+            if (!(hooked instanceof ServerPlayer target)) {
 
                 nbt.putInt(
                         "RodUse",
                         0
                 );
 
-                NbtComponent.set(
-                        DataComponentTypes.CUSTOM_DATA,
+                CustomData.set(
+                        DataComponents.CUSTOM_DATA,
                         stack,
                         nbt
                 );
 
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
 
@@ -403,14 +344,14 @@ public class DropAtFeet implements ModInitializer {
                 }
 
 
-                target.teleport(
-                        target.getEntityWorld(),
+                target.teleportTo(
+                        target.level(),
                         target.getX(),
                         -64.0,
                         target.getZ(),
-                        Set.<PositionFlag>of(),
-                        target.getYaw(1.0F),
-                        target.getPitch(1.0F),
+                        Set.<Relative>of(),
+                        target.getViewYRot(1.0F),
+                        target.getViewXRot(1.0F),
                         false
                 );
             });
@@ -423,14 +364,14 @@ public class DropAtFeet implements ModInitializer {
             );
 
 
-            NbtComponent.set(
-                    DataComponentTypes.CUSTOM_DATA,
+            CustomData.set(
+                    DataComponents.CUSTOM_DATA,
                     stack,
                     nbt
             );
 
 
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
 
