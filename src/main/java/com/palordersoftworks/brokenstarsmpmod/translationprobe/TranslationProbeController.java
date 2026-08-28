@@ -8,35 +8,27 @@ import net.luckperms.api.model.user.User;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permission;
-import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * CheckHacks-style sign translation probing: batches of up to 3 hacks per sign, invisible placement,
- * control-line exploit-preventer detection, and aggregate command execution at the end of a run.
- */
 public final class TranslationProbeController {
     private static final Logger LOGGER = LogUtils.getLogger();
-
-    private static final int JOIN_DELAY_TICKS = 60;
     private static final int LINES_PER_SIGN = 3;
-    private static final int OPEN_SIGN_DELAY_TICKS = 1;
 
     private static volatile CheckHacksConfig fileConfig = CheckHacksConfig.createDefaultRegistry();
     private static volatile boolean runtimeEnabled = false;
@@ -54,12 +46,14 @@ public final class TranslationProbeController {
     public static void reloadConfig(MinecraftServer server) {
         fileConfig = TranslationProbeStorage.load(server);
         runtimeEnabled = fileConfig.enabled;
-        LOGGER.info("[BrokenStarSMP/CheckHacks] Config loaded enabled={} defaultGroup={} joinGroup={} registry={} timeout={} between={}",
+        LOGGER.info("[BrokenStarSMP/CheckHacks] Config loaded enabled={} defaultGroup={} joinGroup={} registry={} joinDelay={} timeout={} openDelay={} between={}",
                 fileConfig.enabled,
                 fileConfig.defaultCheckHacks.size(),
                 fileConfig.autoCheckOnJoin.hacks.size(),
                 fileConfig.hacks.size(),
+                fileConfig.joinDelayTicks,
                 fileConfig.timeoutTicks,
+                fileConfig.openSignDelayTicks,
                 fileConfig.betweenSignTicks);
     }
 
@@ -143,7 +137,15 @@ public final class TranslationProbeController {
         if (cfg.autoCheckOnJoin.onlyFirstJoin && !JOIN_CHECKED.add(player.getUUID())) {
             return;
         }
-        JOIN_AT_TICK.put(player.getUUID(), server.getTickCount() + JOIN_DELAY_TICKS);
+
+        int delay = Math.max(0, cfg.joinDelayTicks);
+        if (delay == 0) {
+            List<String> joinIds = cfg.resolveHackIds(cfg.autoCheckOnJoin.hacks);
+            startPlayerCheck(player, server, joinIds.isEmpty() ? null : joinIds);
+            return;
+        }
+
+        JOIN_AT_TICK.put(player.getUUID(), server.getTickCount() + delay);
     }
 
     public static void clearPlayer(UUID playerId, MinecraftServer server) {
@@ -151,7 +153,7 @@ public final class TranslationProbeController {
 
         CheckRun run = RUNS.remove(playerId);
         if (run != null) {
-            restoreCurrentBatch(server, run);
+            clearCurrentVirtualSign(server, playerId, run);
             run.waiting = null;
         }
 
@@ -162,9 +164,9 @@ public final class TranslationProbeController {
     }
 
     public static void onServerStopping(MinecraftServer server) {
-        for (CheckRun run : RUNS.values()) {
-            restoreCurrentBatch(server, run);
-            run.waiting = null;
+        for (Map.Entry<UUID, CheckRun> entry : RUNS.entrySet()) {
+            clearCurrentVirtualSign(server, entry.getKey(), entry.getValue());
+            entry.getValue().waiting = null;
         }
         RUNS.clear();
         JOIN_AT_TICK.clear();
@@ -194,10 +196,8 @@ public final class TranslationProbeController {
             if (run.waiting != null) {
                 if (tick == run.waiting.openSignAtTick) {
                     ServerPlayer p = server.getPlayerList().getPlayer(id);
-                    if (p != null && p.level() instanceof ServerLevel world) {
-                        if (world.getBlockEntity(run.waiting.signPos) instanceof SignBlockEntity sign) {
-                            TranslationProbeSignHelper.sendSignPackets(p, sign, run.waiting.signPos);
-                        }
+                    if (p != null) {
+                        TranslationProbeSignHelper.sendSignPackets(p, run.waiting.sign, run.waiting.signPos);
                     }
                 } else if (tick > run.waiting.deadlineTick) {
                     handleTimeout(server, id, run);
@@ -219,7 +219,7 @@ public final class TranslationProbeController {
         }
 
         WaitingBatch w = run.waiting;
-        restoreCurrentBatch(server, run);
+        clearCurrentVirtualSign(server, playerId, run);
         run.waiting = null;
 
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
@@ -239,9 +239,6 @@ public final class TranslationProbeController {
         scheduleNextBatchOrFinish(server, playerId, run);
     }
 
-    /**
-     * @return true if vanilla sign handling should be cancelled.
-     */
     public static boolean tryConsumeSignPacket(ServerPlayer player, ServerboundSignUpdatePacket packet) {
         CheckRun run = RUNS.get(player.getUUID());
         if (run == null || run.waiting == null) {
@@ -257,7 +254,7 @@ public final class TranslationProbeController {
 
         MinecraftServer server = player.level().getServer();
         if (server != null) {
-            restoreCurrentBatch(server, run);
+            clearCurrentVirtualSign(server, player.getUUID(), run);
             player.closeContainer();
         }
 
@@ -356,9 +353,7 @@ public final class TranslationProbeController {
 
         CheckHacksConfig cfg = fileConfig;
         List<String> queue;
-        if (hackIdsOrNull == null) {
-            queue = cfg.resolveHackIds(cfg.defaultCheckHacks);
-        } else if (hackIdsOrNull.isEmpty()) {
+        if (hackIdsOrNull == null || hackIdsOrNull.isEmpty()) {
             queue = cfg.resolveHackIds(cfg.defaultCheckHacks);
         } else {
             List<String> requested = new ArrayList<>();
@@ -394,6 +389,7 @@ public final class TranslationProbeController {
                 entries.add(entry);
             }
         }
+
         List<List<HackRegistryEntry>> batches = new ArrayList<>();
         for (int i = 0; i < entries.size(); i += LINES_PER_SIGN) {
             batches.add(new ArrayList<>(entries.subList(i, Math.min(i + LINES_PER_SIGN, entries.size()))));
@@ -419,40 +415,13 @@ public final class TranslationProbeController {
                 run.results.put(hack.id, HackProbeResultState.SKIPPED);
             }
             run.batchIndex++;
-            run.resumeAtTick = server.getTickCount() + Math.max(1, fileConfig.betweenSignTicks);
-            LOGGER.warn("[BrokenStarSMP/CheckHacks] no air near player={}", player.getName().getString());
-            return;
-        }
-
-        BlockPos supportPos = signPos.below();
-        BlockState previousSignState = world.getBlockState(signPos);
-        BlockState previousSupportState = world.getBlockState(supportPos);
-        boolean placedBarrier = world.getBlockState(supportPos).isAir();
-
-        if (placedBarrier && !world.setBlock(supportPos, Blocks.BARRIER.defaultBlockState(), 3)) {
-            deferBatch(server, run);
+            run.resumeAtTick = server.getTickCount() + Math.max(0, fileConfig.betweenSignTicks);
             return;
         }
 
         float yaw = Mth.wrapDegrees(player.getYRot());
         int rotation = (int) Math.floor((yaw + 180.0F) * 16.0F / 360.0F) & 15;
         BlockState signState = Blocks.OAK_SIGN.defaultBlockState().setValue(BlockStateProperties.ROTATION_16, rotation);
-        if (!world.setBlock(signPos, signState, 3)) {
-            if (placedBarrier) {
-                world.setBlock(supportPos, previousSupportState, 3);
-            }
-            deferBatch(server, run);
-            return;
-        }
-
-        if (!(world.getBlockEntity(signPos) instanceof SignBlockEntity sign)) {
-            world.setBlock(signPos, previousSignState, 3);
-            if (placedBarrier) {
-                world.setBlock(supportPos, previousSupportState, 3);
-            }
-            deferBatch(server, run);
-            return;
-        }
 
         Component[] front = new Component[4];
         Component[] back = new Component[4];
@@ -461,35 +430,23 @@ public final class TranslationProbeController {
             front[i] = line;
             back[i] = line;
         }
+
         Component control = Component.keybind(HackProbeClassifier.CONTROL_KEYBIND);
         front[3] = control;
         back[3] = control;
 
         SignText signText = new SignText(front, back, DyeColor.BLACK, false);
+        SignBlockEntity sign = new SignBlockEntity(signPos, signState);
+        sign.setLevel(world);
         sign.setText(signText, true);
         sign.setAllowedPlayerEditor(player.getUUID());
-        sign.setChanged();
 
         int start = server.getTickCount();
-        int deadline = start + Math.max(20, fileConfig.timeoutTicks);
+        int timeout = Math.max(1, fileConfig.timeoutTicks);
+        int deadline = start + timeout;
+        int openAt = start + Math.max(1, fileConfig.openSignDelayTicks);
 
-        run.waiting = new WaitingBatch(
-                batch,
-                signPos,
-                supportPos,
-                previousSignState,
-                previousSupportState,
-                placedBarrier,
-                start,
-                deadline,
-                start + OPEN_SIGN_DELAY_TICKS,
-                world.dimension()
-        );
-
-        LOGGER.info("[BrokenStarSMP/CheckHacks] batch start player={} hacks={} pos={}",
-                player.getName().getString(),
-                batch.stream().map(h -> h.id).toList(),
-                signPos.toShortString());
+        run.waiting = new WaitingBatch(batch, signPos, sign, start, deadline, openAt);
     }
 
     private static Component probeLine(HackRegistryEntry entry) {
@@ -498,10 +455,6 @@ public final class TranslationProbeController {
             case METEOR, TRANSLATE -> Component.translatableWithFallback(key, entry.fallback());
             case KEYBIND -> Component.keybind(key);
         };
-    }
-
-    private static void deferBatch(MinecraftServer server, CheckRun run) {
-        run.resumeAtTick = server.getTickCount() + 20;
     }
 
     private static void dispatchResult(
@@ -538,7 +491,7 @@ public final class TranslationProbeController {
             finishCheck(server, playerId, run);
             return;
         }
-        run.resumeAtTick = server.getTickCount() + Math.max(1, fileConfig.betweenSignTicks);
+        run.resumeAtTick = server.getTickCount() + Math.max(0, fileConfig.betweenSignTicks);
     }
 
     private static void finishCheck(MinecraftServer server, UUID playerId, CheckRun run) {
@@ -593,17 +546,14 @@ public final class TranslationProbeController {
         server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), cmd);
     }
 
-    private static void restoreCurrentBatch(MinecraftServer server, CheckRun run) {
+    private static void clearCurrentVirtualSign(MinecraftServer server, UUID playerId, CheckRun run) {
         WaitingBatch w = run.waiting;
         if (w == null) {
             return;
         }
-        ServerLevel world = server.getLevel(w.worldKey);
-        if (world != null) {
-            world.setBlock(w.signPos, w.previousSignState, 3);
-            if (w.placedBarrier) {
-                world.setBlock(w.supportPos, w.previousSupportState, 3);
-            }
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+        if (player != null) {
+            TranslationProbeSignHelper.clearVirtualSign(player, w.signPos);
         }
     }
 
@@ -616,45 +566,24 @@ public final class TranslationProbeController {
 
         CheckRun(List<List<HackRegistryEntry>> batches) {
             this.batches = batches;
-            this.batchIndex = 0;
-            this.resumeAtTick = 0;
         }
     }
 
     private static final class WaitingBatch {
         final List<HackRegistryEntry> batch;
         final BlockPos signPos;
-        final BlockPos supportPos;
-        final BlockState previousSignState;
-        final BlockState previousSupportState;
-        final boolean placedBarrier;
+        final SignBlockEntity sign;
         final int startTick;
         final int deadlineTick;
         final int openSignAtTick;
-        final ResourceKey<Level> worldKey;
 
-        WaitingBatch(
-                List<HackRegistryEntry> batch,
-                BlockPos signPos,
-                BlockPos supportPos,
-                BlockState previousSignState,
-                BlockState previousSupportState,
-                boolean placedBarrier,
-                int startTick,
-                int deadlineTick,
-                int openSignAtTick,
-                ResourceKey<Level> worldKey
-        ) {
+        WaitingBatch(List<HackRegistryEntry> batch, BlockPos signPos, SignBlockEntity sign, int startTick, int deadlineTick, int openSignAtTick) {
             this.batch = batch;
             this.signPos = signPos.immutable();
-            this.supportPos = supportPos.immutable();
-            this.previousSignState = previousSignState;
-            this.previousSupportState = previousSupportState;
-            this.placedBarrier = placedBarrier;
+            this.sign = sign;
             this.startTick = startTick;
             this.deadlineTick = deadlineTick;
             this.openSignAtTick = openSignAtTick;
-            this.worldKey = worldKey;
         }
     }
 }

@@ -1,0 +1,226 @@
+enabled: true
+
+default-check-hacks:
+  - meteor-client
+  - meteor-client-commands
+  - liquidbounce
+  - liquidbounce-enabled
+  - freecam
+  - zergatul-freecam
+  - wurst
+  - xray-fabric
+  - chestesp
+  - killaura-fabric
+  - autofish
+  - lumina
+  - autoswitch
+  - bleachhack
+  - aristois
+  - coffee
+  - world-downloader
+  - autoclicker-fabric
+  - autoclicker-rinf
+  - antiafk
+  - auto-clicker-mc
+  - hypnotic-client
+  - autoattack
+  - flymod
+  - flighthelper
+  - climbladdersfast
+  - stepup
+  - playerhighlighter
+
+auto-check-on-join:
+  enabled: true
+  only-first-join: false
+  hacks:
+    - meteor-client
+    - liquidbounce
+    - freecam
+    - wurst
+    - bleachhack
+    - aristois
+    - world-downloader
+    - autoclicker-fabric
+    - antiafk
+
+detect-flag:
+  enabled: true
+  anticheats:
+    grimac: true
+  cooldown-hours: 24
+  hacks:
+    - meteor-client
+    - liquidbounce
+    - freecam
+    - wurst
+    - bleachhack
+    - aristois
+    - world-downloader
+    - autoclicker-fabric
+    - antiafk
+
+command-if-positive:
+  enabled: false
+  command: ""
+
+command-if-protected:
+  enabled: false
+  command: ""
+
+command-if-clean:
+  enabled: false
+  command: ""
+
+join-delay-ticks: 0
+open-sign-delay-ticks: 1
+timeout-ticks: 40
+between-sign-ticks: 1
+
+bedrock:
+  enabled: true
+  prefixes:
+    - "."
+    - "*"
+
+hacks:
+  meteor-client:
+    id: meteor-client
+    display-name: Meteor Client
+    key: key.meteor-client.open-gui
+    mode: METEOR
+  meteor-client-commands:
+    id: meteor-client-commands
+    display-name: Meteor Client Commands
+    key: key.meteor-client.open-commands
+    mode: METEOR
+  liquidbounce:
+    id: liquidbounce
+    display-name: LiquidBounce
+    key: liquidbounce.module.killaura.name
+    mode: TRANSLATE
+  liquidbounce-enabled:
+    id: liquidbounce-enabled
+    display-name: LiquidBounce Enabled
+    key: liquidbounce.generic.enabled
+    mode: TRANSLATE
+  freecam:
+    id: freecam
+    display-name: Freecam
+    key: key.freecam.toggle
+    mode: KEYBIND
+  zergatul-freecam:
+    id: zergatul-freecam
+    display-name: Zergatul Freecam
+    key: key.zergatul.freecam.toggle
+    mode: KEYBIND
+  wurst:
+    id: wurst
+    display-name: Wurst Client (-1.21)
+    key: key.wurst.zoom
+    mode: KEYBIND
+  xray-fabric:
+    id: xray-fabric
+    display-name: XRay (Fabric)
+    key: xray.config.toggle
+    mode: KEYBIND
+  chestesp:
+    id: chestesp
+    display-name: ChestESP
+    key: key.chestesp.toggle
+    mode: KEYBIND
+  killaura-fabric:
+    id: killaura-fabric
+    display-name: KillAura (Fabric)
+    key: key.killaura
+    mode: KEYBIND
+  autofish:
+    id: autofish
+    display-name: AutoFish
+    key: key.autofish.open_gui
+    mode: KEYBIND
+  lumina:
+    id: lumina
+    display-name: Lumina
+    key: key.lumina.open_click_gui
+    mode: KEYBIND
+  autoswitch:
+    id: autoswitch
+    display-name: AutoSwitch
+    key: key.autoswitch.toggle
+    mode: KEYBIND
+  bleachhack:
+    id: bleachhack
+    display-name: BleachHack
+    key: bleachhack.module.killaura
+    mode: TRANSLATE
+  aristois:
+    id: aristois
+    display-name: Aristois
+    key: emc.module.killaura.name
+    mode: TRANSLATE
+  coffee:
+    id: coffee
+    display-name: Coffee Client
+    key: coffee.module.killaura.name
+    mode: TRANSLATE
+  world-downloader:
+    id: world-downloader
+    display-name: World Downloader
+    key: key.wdl.startStop
+    mode: TRANSLATE
+  autoclicker-fabric:
+    id: autoclicker-fabric
+    display-name: AutoClicker (Fabric)
+    key: autoclicker-fabric.hud.holding
+    mode: TRANSLATE
+  autoclicker-rinf:
+    id: autoclicker-rinf
+    display-name: AutoClicker RINF
+    key: key.autoclicker-rinf.toggleacf
+    mode: KEYBIND
+  antiafk:
+    id: antiafk
+    display-name: AntiAFK
+    key: key.antiafk.toggle
+    mode: TRANSLATE
+  auto-clicker-mc:
+    id: auto-clicker-mc
+    display-name: Auto Clicker (p1k0chu)
+    key: key.auto-clicker_.toggle
+    mode: KEYBIND
+  hypnotic-client:
+    id: hypnotic-client
+    display-name: Hypnotic Client
+    key: key.hypnotic-client.open-click-gui
+    mode: KEYBIND
+  autoattack:
+    id: autoattack
+    display-name: AutoAttack
+    key: key.autoattack.afkAttack
+    mode: KEYBIND
+  flymod:
+    id: flymod
+    display-name: Flymod
+    key: key.flymod.toggle
+    mode: KEYBIND
+  flighthelper:
+    id: flighthelper
+    display-name: FlightHelper
+    key: key.flighthelper.lockup
+    mode: KEYBIND
+  climbladdersfast:
+    id: climbladdersfast
+    display-name: Climb Ladders Fast
+    key: key.climbladdersfast.toggle
+    mode: KEYBIND
+  stepup:
+    id: stepup
+    display-name: StepUp
+    key: key.stepup.toggle
+    mode: KEYBIND
+  playerhighlighter:
+    id: playerhighlighter
+    display-name: PlayerHighlighter
+    key: key.playerhighlighter.toggle
+    mode: KEYBIND
