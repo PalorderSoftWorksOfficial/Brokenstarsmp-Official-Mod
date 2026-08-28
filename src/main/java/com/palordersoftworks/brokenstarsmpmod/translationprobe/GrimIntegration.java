@@ -33,7 +33,7 @@ public final class GrimIntegration implements ModInitializer {
         server = minecraftServer;
         try {
             GrimAbstractAPI api = GrimAPIProvider.get();
-            plugin = api.getGrimPlugin("brokenstarsmp");
+            plugin = api.getGrimPlugin(GrimIntegration.class);
             api.getEventBus().get(FlagEvent.class).onFlag(plugin, GrimIntegration::onFlag, 100, false);
             registered = true;
             LOGGER.info("[BrokenStarSMP/Grim] GrimAC integration enabled for version {}", api.getGrimVersion());
