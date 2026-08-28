@@ -1,27 +1,33 @@
 package com.palordersoftworks.brokenstarsmpmod.fluid;
 
-import java.util.ArrayDeque;
-import java.util.Queue;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 public final class CobbleOreQueue {
-    private CobbleOreQueue() {}
+    private static final int MAX_PER_TICK = 2048;
+    private static final Set<Entry> QUEUE = new LinkedHashSet<>();
 
-    private record Entry(Level world, BlockPos pos) {}
+    private CobbleOreQueue() {
+    }
 
-    private static final Queue<Entry> QUEUE = new ArrayDeque<>();
+    private record Entry(Level world, BlockPos pos) {
+    }
 
     public static void enqueue(Level world, BlockPos pos) {
+        if (world.isClientSide()) {
+            return;
+        }
         QUEUE.add(new Entry(world, pos.immutable()));
     }
 
     public static void process() {
-        while (!QUEUE.isEmpty()) {
-            Entry entry = QUEUE.poll();
-            if (entry != null) {
-                CobbleOreProcessor.process(entry.world(), entry.pos());
-            }
+        int processed = 0;
+        while (!QUEUE.isEmpty() && processed++ < MAX_PER_TICK) {
+            Entry entry = QUEUE.iterator().next();
+            QUEUE.remove(entry);
+            CobbleOreProcessor.process(entry.world(), entry.pos());
         }
     }
 }
