@@ -1,5 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.translationprobe;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.util.Locale;
 
 public final class HackRegistryEntry {
@@ -7,6 +9,7 @@ public final class HackRegistryEntry {
     private static final char FALLBACK_CLOSE = '\u27e7';
 
     public String id;
+    @SerializedName("display-name")
     public String displayName = "";
     public String key = "";
     public HackProbeMode mode = HackProbeMode.KEYBIND;
