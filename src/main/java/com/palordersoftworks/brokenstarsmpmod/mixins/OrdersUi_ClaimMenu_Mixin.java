@@ -1,7 +1,6 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.reazip.economycraft.util.ClickKind;
-import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -20,10 +19,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Restores BrokenStars Drop All on EconomyCraft's deliveries GUI
- * (upstream uses that slot for Main menu only).
- */
+import java.util.ArrayList;
+import java.util.List;
+
 @Mixin(targets = "com.reazip.economycraft.orders.OrdersUi$ClaimMenu", remap = false)
 public abstract class OrdersUi_ClaimMenu_Mixin {
 
@@ -39,26 +37,29 @@ public abstract class OrdersUi_ClaimMenu_Mixin {
     private void removeStack(ItemStack stack) {}
 
     @Unique
-    private static final int DROP_ALL_SLOT_OFFSET = 7;
+    private static final int BROKENSTARSMP_DROP_ALL_SLOT_OFFSET = 7;
 
     @Inject(method = "updatePage", at = @At("RETURN"))
     private void brokenstarsmp$addDropAllButton(CallbackInfo ci) {
         ItemStack dropAll = new ItemStack(Items.DROPPER);
+
         dropAll.set(
                 DataComponents.CUSTOM_NAME,
                 Component.literal("Drop All")
                         .withStyle(s -> s.withItalic(false).withColor(ChatFormatting.GREEN))
         );
+
         dropAll.set(
                 DataComponents.LORE,
                 new ItemLore(List.of(
-                        Component.literal("Drops every item")
+                        Component.literal("Drops every delivery")
                                 .withStyle(s -> s.withItalic(false).withColor(ChatFormatting.GRAY)),
                         Component.literal("on this page.")
                                 .withStyle(s -> s.withItalic(false).withColor(ChatFormatting.GRAY))
                 ))
         );
-        container.setItem(navRowStart + DROP_ALL_SLOT_OFFSET, dropAll);
+
+        container.setItem(navRowStart + BROKENSTARSMP_DROP_ALL_SLOT_OFFSET, dropAll);
     }
 
     @Inject(method = "onClick", at = @At("HEAD"), cancellable = true)
@@ -72,13 +73,16 @@ public abstract class OrdersUi_ClaimMenu_Mixin {
         if (kind != ClickKind.PICKUP) {
             return;
         }
-        if (slot != navRowStart + DROP_ALL_SLOT_OFFSET) {
+
+        if (slot != navRowStart + BROKENSTARSMP_DROP_ALL_SLOT_OFFSET) {
             return;
         }
+
         if (!(player instanceof ServerPlayer serverPlayer)) {
             cir.setReturnValue(true);
             return;
         }
+
         brokenstarsmp$dropAllOnPage(serverPlayer);
         cir.setReturnValue(true);
     }
@@ -86,28 +90,36 @@ public abstract class OrdersUi_ClaimMenu_Mixin {
     @Unique
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void brokenstarsmp$dropAllOnPage(ServerPlayer player) {
-        int start = page * 45;
-        int end = Math.min(start + 45, items.size());
+        final int ITEMS_PER_PAGE = 45;
+
+        int start = page * ITEMS_PER_PAGE;
+        int end = Math.min(start + ITEMS_PER_PAGE, items.size());
+
+        if (start >= end) {
+            player.sendSystemMessage(
+                    Component.literal("No deliveries to drop.")
+                            .withStyle(ChatFormatting.RED)
+            );
+            updatePage();
+            return;
+        }
+
+        List<ItemStack> deliveries = new ArrayList<>(end - start);
+
+        for (int i = start; i < end; i++) {
+            Object raw = items.get(i);
+
+            if (raw instanceof ItemStack stack && !stack.isEmpty()) {
+                deliveries.add(stack.copy());
+            }
+        }
+
         int dropped = 0;
 
-        // Back-to-front so removeStack index shifts do not skip entries.
-        for (int i = end - 1; i >= start; i--) {
-            Object raw = items.get(i);
-            if (!(raw instanceof ItemStack stack) || stack.isEmpty()) {
-                continue;
-            }
-            player.drop(stack.copy(), false);
+        for (ItemStack stack : deliveries) {
+            player.drop(stack, false);
             removeStack(stack);
             dropped++;
-        }
-
-        int remaining = Math.max(0, items.size() - dropped);
-        int totalPages = Math.max(1, (int) Math.ceil(remaining / 45.0));
-        if (page >= totalPages) {
-            page = totalPages - 1;
-        }
-        if (page < 0) {
-            page = 0;
         }
 
         updatePage();
