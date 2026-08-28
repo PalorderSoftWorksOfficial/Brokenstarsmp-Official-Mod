@@ -18,6 +18,11 @@
       "com.palordersoftworks.brokenstarsmpmod.translationprobe.GrimIntegration"
     ]
   },
+  "jars": [
+    {
+      "file": "META-INF/jars/grimac.jar"
+    }
+  ],
   "mixins": [
     "brokenstarsmp.mixins.json"
   ],
