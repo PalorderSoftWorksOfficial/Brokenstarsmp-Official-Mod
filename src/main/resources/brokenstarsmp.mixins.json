@@ -30,6 +30,7 @@
     "ProjectileEntity_LifetimeMixin",
     "ServerPlayerEntity_Mixin",
     "ServerPlayNetworkHandler_TranslationProbeMixin",
+    "ServerCommonPacketListenerImpl_LunarClientMixin",
     "ServerShopUi_Rename_Mixin",
     "ServerWorld_EntityProcessingLimit_Mixin",
     "ShopUi_Rename_Mixin"
