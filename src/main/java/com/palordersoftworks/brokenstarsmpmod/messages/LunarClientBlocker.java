@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class LunarClientBlocker {
-    private static final String REASON = "Disallowed Mods: Lunar Client";
+    private static final String REASON = "Disallowed Modifications: Lunar Client";
 
     private LunarClientBlocker() {
     }
