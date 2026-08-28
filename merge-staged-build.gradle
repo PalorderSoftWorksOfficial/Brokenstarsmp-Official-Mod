@@ -1,0 +1,23 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.apache.httpcomponents.client5:httpclient5:5.6.1"
+        classpath "org.apache.jackrabbit:jackrabbit-webdav:2.22.3"
+    }
+}
+
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+    id 'org.jetbrains.kotlin.jvm' version '2.3.10'
+    id("com.gradleup.shadow") version "9.4.1"
+}
+
+base {
+    archivesName = project.archives_base_name
+}
+version = project.mod_version
+group = project.maven_group
+
