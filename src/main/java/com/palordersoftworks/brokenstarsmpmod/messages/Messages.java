@@ -20,7 +20,9 @@ import java.util.List;
 import java.util.Map;
 
 public final class Messages {
-    private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("brokenstarsmp").resolve("messages.yml");
+    private static final Path CONFIG_DIRECTORY = FabricLoader.getInstance().getConfigDir().resolve("brokenstarsmp");
+    private static final Path FILE = CONFIG_DIRECTORY.resolve("messages.yml");
+    private static final Path LEGACY_FILE = CONFIG_DIRECTORY.resolve("messages.json");
     private static final Map<String, List<String>> MESSAGES = new LinkedHashMap<>();
     private static final Yaml YAML = new Yaml(new SafeConstructor(new LoaderOptions()));
     private static boolean initialized;
@@ -34,13 +36,17 @@ public final class Messages {
         }
 
         try {
-            Files.createDirectories(FILE.getParent());
+            Files.createDirectories(CONFIG_DIRECTORY);
             if (Files.notExists(FILE)) {
-                try (InputStream input = Messages.class.getClassLoader().getResourceAsStream("messages.yml")) {
-                    if (input == null) {
-                        throw new IOException("messages.yml is missing from the mod jar");
+                if (Files.exists(LEGACY_FILE)) {
+                    Files.move(LEGACY_FILE, FILE);
+                } else {
+                    try (InputStream input = Messages.class.getClassLoader().getResourceAsStream("messages.yml")) {
+                        if (input == null) {
+                            throw new IOException("messages.yml is missing from the mod jar");
+                        }
+                        Files.copy(input, FILE);
                     }
-                    Files.copy(input, FILE);
                 }
             }
             reload();
@@ -89,7 +95,7 @@ public final class Messages {
     }
 
     public static synchronized void save() throws IOException {
-        Files.createDirectories(FILE.getParent());
+        Files.createDirectories(CONFIG_DIRECTORY);
         try (Writer writer = Files.newBufferedWriter(FILE, StandardCharsets.UTF_8)) {
             YAML.dump(MESSAGES, writer);
         }
