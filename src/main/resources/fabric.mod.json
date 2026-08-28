@@ -14,7 +14,8 @@
   "environment": "server",
   "entrypoints": {
     "main": [
-      "com.palordersoftworks.brokenstarsmpmod.initiaters.DropAtFeet"
+      "com.palordersoftworks.brokenstarsmpmod.initiaters.DropAtFeet",
+      "com.palordersoftworks.brokenstarsmpmod.translationprobe.GrimIntegration"
     ]
   },
   "mixins": [
