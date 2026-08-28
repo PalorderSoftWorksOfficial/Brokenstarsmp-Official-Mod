@@ -34,7 +34,7 @@ public final class GrimIntegration implements ModInitializer {
         try {
             GrimAbstractAPI api = GrimAPIProvider.get();
             plugin = api.getGrimPlugin("brokenstarsmp");
-            api.getEventBus().get(FlagEvent.class).onFlagSupplier(plugin, GrimIntegration::onFlag, 100, false);
+            api.getEventBus().get(FlagEvent.class).onFlag(plugin, GrimIntegration::onFlag, 100, false);
             registered = true;
             LOGGER.info("[BrokenStarSMP/Grim] GrimAC integration enabled for version {}", api.getGrimVersion());
         } catch (Throwable throwable) {
@@ -43,7 +43,7 @@ public final class GrimIntegration implements ModInitializer {
         }
     }
 
-    private static boolean onFlag(GrimUser user, AbstractCheck check, java.util.function.Supplier<String> verbose, boolean cancelled) {
+    private static boolean onFlag(GrimUser user, AbstractCheck check, String verbose, boolean cancelled) {
         if (!registered || cancelled || user == null) {
             return cancelled;
         }
