@@ -62,6 +62,7 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
     implementation "eu.pb4:placeholder-api:3.1.0-beta.1+26.2"
     implementation include("eu.pb4:sgui:2.1.0+26.2")
+    implementation include("org.yaml:snakeyaml:2.4")
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4")
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.4"
     compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.4"
