@@ -18,45 +18,32 @@ plugins {
 base {
     archivesName = project.archives_base_name
 }
+
 version = project.mod_version
 group = project.maven_group
 
-def resolveLatestGrimFabric = {
-    def override = project.findProperty("grim_version")
-    if (override != null && !override.toString().isBlank()) {
-        return override.toString()
-    }
-    def query = "https://api.modrinth.com/v2/project/grimac/version?loaders=%5B%22fabric%22%5D&game_versions=%5B%22${project.minecraft_version}%22%5D&limit=1"
-    def connection = new URL(query).openConnection()
-    connection.setRequestProperty("User-Agent", "Brokenstarsmp-Official-Mod/${project.mod_version}")
-    connection.setConnectTimeout(15000)
-    connection.setReadTimeout(15000)
-    def versions = new groovy.json.JsonSlurper().parse(connection.getInputStream())
-    if (!(versions instanceof List) || versions.isEmpty() || versions[0].id == null) {
-        throw new GradleException("Unable to resolve the latest GrimAC Fabric build for Minecraft ${project.minecraft_version}")
-    }
-    def resolved = versions[0].id.toString()
-    println("Resolved latest GrimAC Fabric build: ${versions[0].version_number} (${resolved})")
-    return resolved
-}
-
-def grimVersion = resolveLatestGrimFabric()
-
 repositories {
     mavenCentral()
-    maven { url 'https://maven.nucleoid.xyz'}
+
+    maven {
+        url 'https://maven.nucleoid.xyz'
+    }
+
     maven {
         name = 'GrimAC'
         url = 'https://repo.grim.ac/snapshots'
     }
+
     maven {
         name = 'FabricMC'
         url = 'https://maven.fabricmc.net/'
     }
+
     maven {
         name = 'squiddev repository'
         url = 'https://maven.squiddev.cc/'
     }
+
     exclusiveContent {
         forRepository {
             maven {
@@ -78,28 +65,36 @@ configurations {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
     implementation "eu.pb4:placeholder-api:3.1.0-beta.1+26.2"
     implementation include("eu.pb4:sgui:2.1.0+26.2")
+
     implementation "net.kyori:adventure-platform-fabric:7.1.1"
     implementation include("net.kyori:adventure-text-minimessage:5.2.0")
     implementation include("net.kyori:adventure-text-serializer-gson:5.2.0")
+
     implementation include("org.yaml:snakeyaml:2.6")
+
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4")
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.4"
     compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.4"
+
     compileOnly "ac.grim.grimac:GrimAPI:1.3.2.1"
-    grimNested "maven.modrinth:LJNGWSvH:${grimVersion}"
+
+    implementation files("libs/grimac-fabric-2.3.74-58c8b92.jar")
+    grimNested files("libs/grimac-fabric-2.3.74-58c8b92.jar")
 
     implementation "net.fabricmc:fabric-language-kotlin:1.13.9+"
+
     implementation include("eu.pb4:polymer-core:0.17.3+26.2")
     implementation include("eu.pb4:polymer-blocks:0.17.3+26.2")
     implementation include("eu.pb4:polymer-resource-pack:0.17.3+26.2")
     implementation include("eu.pb4:polymer-virtual-entity:0.17.3+26.2")
     implementation include("eu.pb4:polymer-networking:0.17.3+26.2")
 
-    localRuntime "maven.modrinth:LJNGWSvH:${grimVersion}"
     localRuntime "party.iroiro.luajava:luajit:4.1.0"
     localRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
@@ -110,8 +105,10 @@ dependencies {
     luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
     compileOnly 'net.luckperms:api:5.4'
+
     compileOnly "maven.modrinth:H4o5bO7g:HnyvUyL6"
     localRuntime "maven.modrinth:H4o5bO7g:HnyvUyL6"
+
     localRuntime "maven.modrinth:lhGA9TYQ:1yQC4VvP"
 }
 
@@ -138,10 +135,17 @@ tasks.named("jar") {
 
 tasks.named("shadowJar") {
     archiveClassifier.set("")
-    configurations = [project.configurations.luaShadow, project.configurations.Shadow]
+
+    configurations = [
+            project.configurations.luaShadow,
+            project.configurations.Shadow
+    ]
+
     into("META-INF/jars") {
         from(project.configurations.grimNested) {
-            rename { "grimac.jar" }
+            rename {
+                "grimac.jar"
+            }
         }
     }
 }
@@ -162,11 +166,18 @@ def bumpVersionLogic = { type ->
 
     def versionFile = file("gradle.properties")
     def props = new Properties()
-    versionFile.withInputStream { props.load(it) }
+
+    versionFile.withInputStream {
+        props.load(it)
+    }
 
     def currentVersion = props["mod_version"]
+
     def matcher = currentVersion =~ /(\d+)\.(\d+)\.(\d+)(-.+)?/
-    if (!matcher.matches()) throw new GradleException("Invalid version format: $currentVersion")
+
+    if (!matcher.matches()) {
+        throw new GradleException("Invalid version format: $currentVersion")
+    }
 
     def major = matcher[0][1].toInteger()
     def minor = matcher[0][2].toInteger()
@@ -179,19 +190,26 @@ def bumpVersionLogic = { type ->
             minor = 0
             patch = 0
             break
+
         case "minor":
             minor += 1
             patch = 0
             break
+
         case "patch":
             patch += 1
             break
     }
 
     def newVersion = "${major}.${minor}.${patch}${suffix}"
+
     println "Bumping version: $currentVersion -> $newVersion"
 
-    versionFile.text = versionFile.text.replaceFirst(/mod_version=.*/, "mod_version=${newVersion}")
+    versionFile.text = versionFile.text.replaceFirst(
+            /mod_version=.*/,
+            "mod_version=${newVersion}"
+    )
+
     project.version = newVersion
 }
 
@@ -199,16 +217,22 @@ tasks.register("bumpVersion") {
     doLast {
         def type = "patch"
         def args = gradle.startParameter.taskRequests[0].args
+
         args.each { arg ->
-            if (arg.startsWith("--")) type = arg.substring(2)
+            if (arg.startsWith("--")) {
+                type = arg.substring(2)
+            }
         }
+
         bumpVersionLogic(type)
     }
 }
 
 ["major", "minor", "patch"].each { t ->
     tasks.register("bump${t.capitalize()}") {
-        doLast { bumpVersionLogic(t) }
+        doLast {
+            bumpVersionLogic(t)
+        }
     }
 }
 
@@ -241,6 +265,7 @@ publishing {
             artifact(tasks.named("shadowJar")) {
                 builtBy tasks.named("shadowJar")
             }
+
             artifact(tasks.named("sourcesJar"))
             artifact(tasks.named("javadocJar"))
         }
@@ -250,6 +275,7 @@ publishing {
         maven {
             name = "palorderHosting"
             url = uri("https://maven.palorderhosting.net/releases/")
+
             credentials {
                 username = System.getenv("MAVEN_USERNAME")
                 password = System.getenv("MAVEN_PASSWORD")
