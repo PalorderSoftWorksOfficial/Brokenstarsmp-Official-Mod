@@ -46,7 +46,8 @@ auto-check-on-join:
 
 detect-flag:
   enabled: true
-  anticheats: {}
+  anticheats:
+    grimac: true
   cooldown-hours: 24
   hacks:
     - meteor-client
