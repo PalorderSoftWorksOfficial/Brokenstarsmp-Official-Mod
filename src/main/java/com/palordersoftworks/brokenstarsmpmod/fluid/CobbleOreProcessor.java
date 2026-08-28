@@ -8,9 +8,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
 public final class CobbleOreProcessor {
-    private CobbleOreProcessor() {}
-
-    private static final Block[] ORE_POOL = new Block[] {
+    private static final Block[] ORE_POOL = new Block[]{
             Blocks.COAL_ORE,
             Blocks.COPPER_ORE,
             Blocks.IRON_ORE,
@@ -31,13 +29,22 @@ public final class CobbleOreProcessor {
             Blocks.NETHER_GOLD_ORE
     };
 
-    public static void process(net.minecraft.world.level.Level world, BlockPos pos) {
-        if (!ServerRules.RANDOM_ORE_COBBLESTONE) return;
-        if (!(world instanceof ServerLevel serverWorld)) return;
-        if (!serverWorld.hasChunkAt(pos)) return;
+    private CobbleOreProcessor() {
+    }
 
-        Block current = serverWorld.getBlockState(pos).getBlock();
-        if (current != Blocks.COBBLESTONE && current != Blocks.STONE) return;
+    public static void process(net.minecraft.world.level.Level world, BlockPos pos) {
+        if (!ServerRules.RANDOM_ORE_COBBLESTONE) {
+            return;
+        }
+        if (!(world instanceof ServerLevel serverWorld)) {
+            return;
+        }
+        if (!serverWorld.hasChunkAt(pos)) {
+            return;
+        }
+        if (!serverWorld.getBlockState(pos).is(Blocks.COBBLESTONE)) {
+            return;
+        }
 
         Block ore = ORE_POOL[ThreadLocalRandom.current().nextInt(ORE_POOL.length)];
         serverWorld.setBlock(pos, ore.defaultBlockState(), 3);
