@@ -112,9 +112,12 @@ public final class CheckHacksConfig {
 
         c.defaultCheckHacks = new ArrayList<>(c.hacks.keySet());
         c.autoCheckOnJoin = new AutoCheckOnJoin();
-        c.autoCheckOnJoin.hacks = new ArrayList<>(c.hacks.keySet());
+        c.autoCheckOnJoin.hacks = new ArrayList<>(List.of(
+                "meteor-client", "liquidbounce", "freecam", "wurst",
+                "bleachhack", "aristois", "world-downloader", "autoclicker-fabric", "antiafk"
+        ));
         c.detectFlag = new DetectFlag();
-        c.detectFlag.hacks = new ArrayList<>(c.hacks.keySet());
+        c.detectFlag.hacks = new ArrayList<>(c.autoCheckOnJoin.hacks);
         return c;
     }
 
