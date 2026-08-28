@@ -117,6 +117,7 @@ public final class CheckHacksConfig {
                 "bleachhack", "aristois", "world-downloader", "autoclicker-fabric", "antiafk"
         ));
         c.detectFlag = new DetectFlag();
+        c.detectFlag.anticheats.put("grimac", true);
         c.detectFlag.hacks = new ArrayList<>(c.autoCheckOnJoin.hacks);
         return c;
     }
