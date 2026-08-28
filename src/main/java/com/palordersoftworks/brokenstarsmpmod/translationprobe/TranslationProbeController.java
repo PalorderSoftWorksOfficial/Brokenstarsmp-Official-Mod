@@ -444,7 +444,7 @@ public final class TranslationProbeController {
         int start = server.getTickCount();
         int timeout = Math.max(1, fileConfig.timeoutTicks);
         int deadline = start + timeout;
-        int openAt = start + Math.max(0, fileConfig.openSignDelayTicks);
+        int openAt = start + Math.max(1, fileConfig.openSignDelayTicks);
 
         run.waiting = new WaitingBatch(batch, signPos, sign, start, deadline, openAt);
     }
