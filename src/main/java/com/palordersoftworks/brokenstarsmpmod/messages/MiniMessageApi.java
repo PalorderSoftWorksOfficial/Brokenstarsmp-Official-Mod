@@ -1,10 +1,13 @@
 package com.palordersoftworks.brokenstarsmpmod.messages;
 
+import com.google.gson.JsonElement;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
-import net.kyori.adventure.platform.fabric.FabricAudiences;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
+import com.mojang.serialization.JsonOps;
+import net.minecraft.network.chat.ComponentSerialization;
 
 import java.util.Map;
 
@@ -33,7 +36,8 @@ public final class MiniMessageApi {
     }
 
     public static net.minecraft.network.chat.Component toNative(Component component) {
-        return FabricAudiences.toNative(component);
+        JsonElement json = GsonComponentSerializer.gson().serializeToTree(component);
+        return ComponentSerialization.CODEC.parse(JsonOps.INSTANCE, json).getOrThrow();
     }
 
     private static String sanitize(String value) {

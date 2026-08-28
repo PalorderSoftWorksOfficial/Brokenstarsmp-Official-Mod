@@ -12,10 +12,10 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -370,7 +370,7 @@ public final class ConfigManager {
     }
 
     private static Component buildInteractiveRow(ConfigEntry<?> entry, String displayName, List<String> options, String description, String commandName) {
-        Component row = Component.literal("- " + displayName + " ")
+        MutableComponent row = Component.literal("- " + displayName + " ")
                 .withStyle(ChatFormatting.YELLOW)
                 .append(Component.literal(description).withStyle(ChatFormatting.DARK_GRAY));
 
@@ -397,7 +397,7 @@ public final class ConfigManager {
         options.setPrettyFlow(true);
         options.setIndent(2);
         options.setWidth(120);
-        return new Yaml(new SafeConstructor(new LoaderOptions()), options);
+        return new Yaml(new LoaderOptions(), options);
     }
 
     private static String toFileName(Class<?> clazz) {
