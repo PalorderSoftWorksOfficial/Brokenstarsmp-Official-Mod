@@ -23,13 +23,8 @@ group = project.maven_group
 
 repositories {
     mavenCentral()
-
     maven { url 'https://jitpack.io' }
     maven { url 'https://maven.nucleoid.xyz'}
-    //maven {
-        //name = 'PalorderHosting'
-        //url = 'https://maven.palorderhosting.net/releases'
-    //}
     maven {
         name = 'FabricMC'
         url = 'https://maven.fabricmc.net/'
@@ -62,35 +57,30 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
     implementation "eu.pb4:placeholder-api:3.1.0-beta.1+26.2"
     implementation include("eu.pb4:sgui:2.1.0+26.2")
-    implementation include("net.kyori:adventure-platform-fabric:7.1.1")
-    implementation include("net.kyori:adventure-text-minimessage:5.2.0")
+    implementation "net.kyori:adventure-platform-fabric:7.1.1"
+    implementation "net.kyori:adventure-text-minimessage:5.2.0"
+    implementation "org.yaml:snakeyaml:2.6"
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4")
     compileOnly "io.github.llamalad7:mixinextras-common:0.5.4"
     compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.4"
 
     implementation "net.fabricmc:fabric-language-kotlin:1.13.9+"
-    // Polymer dependencies
     implementation include("eu.pb4:polymer-core:0.17.3+26.2")
     implementation include("eu.pb4:polymer-blocks:0.17.3+26.2")
     implementation include("eu.pb4:polymer-resource-pack:0.17.3+26.2")
     implementation include("eu.pb4:polymer-virtual-entity:0.17.3+26.2")
     implementation include("eu.pb4:polymer-networking:0.17.3+26.2")
 
-    // Dev runtime visibility
     localRuntime "party.iroiro.luajava:luajit:4.1.0"
     localRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
-    // Compile-time access
     compileOnly "party.iroiro.luajava:luajit:4.1.0"
     compileOnly "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
-    // Pack into the final mod jar
     luaShadow "party.iroiro.luajava:luajit:4.1.0"
     luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
 
     compileOnly 'net.luckperms:api:5.4'
-
-    // EconomyCraft (Modrinth) — compile against it; do not shade into this mod
     compileOnly "maven.modrinth:H4o5bO7g:HnyvUyL6"
     localRuntime "maven.modrinth:H4o5bO7g:HnyvUyL6"
     localRuntime "maven.modrinth:lhGA9TYQ:1yQC4VvP"
