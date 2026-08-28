@@ -1,34 +1,49 @@
 package com.palordersoftworks.brokenstarsmpmod.config;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.*;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.palordersoftworks.brokenstarsmpmod.config.Enums.RuleType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
-import com.palordersoftworks.brokenstarsmpmod.config.Enums.RuleType;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ConfigManager {
-
+public final class ConfigManager {
     public static abstract class ConfigEntry<T> {
         protected T value;
         public final String key;
         public final Field field;
         public final RuleType type;
+        public final Class<?> configClass;
 
-        public ConfigEntry(String key, Field field, RuleType type, T defaultValue) {
+        protected ConfigEntry(String key, Field field, RuleType type, T defaultValue, Class<?> configClass) {
             this.key = key;
             this.field = field;
             this.type = type;
             this.value = defaultValue;
+            this.configClass = configClass;
         }
 
         public T get() {
@@ -38,97 +53,157 @@ public class ConfigManager {
         public void set(T value) {
             this.value = value;
             try {
-                if (field != null) field.set(null, value);
-            } catch (IllegalAccessException ignored) {}
+                if (field != null) {
+                    field.set(null, value);
+                }
+            } catch (IllegalAccessException exception) {
+                throw new IllegalStateException("Unable to update config field " + field.getName(), exception);
+            }
         }
     }
 
-    public static class BoolConfig extends ConfigEntry<Boolean> {
-        public BoolConfig(String key, Boolean defaultValue) {
-            super(key, null, RuleType.BOOL, defaultValue);
-        }
-
-        public BoolConfig(String key, Field field, Boolean defaultValue) {
-            super(key, field, RuleType.BOOL, defaultValue);
+    public static final class BoolConfig extends ConfigEntry<Boolean> {
+        private BoolConfig(String key, Field field, Boolean defaultValue, Class<?> configClass) {
+            super(key, field, RuleType.BOOL, defaultValue, configClass);
         }
     }
 
-    public static class IntConfig extends ConfigEntry<Integer> {
-        public IntConfig(String key, Field field, Integer defaultValue) {
-            super(key, field, RuleType.INT, defaultValue);
+    public static final class IntConfig extends ConfigEntry<Integer> {
+        private IntConfig(String key, Field field, Integer defaultValue, Class<?> configClass) {
+            super(key, field, RuleType.INT, defaultValue, configClass);
         }
     }
 
-    public static class DoubleConfig extends ConfigEntry<Double> {
-        public DoubleConfig(String key, Field field, Double defaultValue) {
-            super(key, field, RuleType.DOUBLE, defaultValue);
+    public static final class DoubleConfig extends ConfigEntry<Double> {
+        private DoubleConfig(String key, Field field, Double defaultValue, Class<?> configClass) {
+            super(key, field, RuleType.DOUBLE, defaultValue, configClass);
         }
     }
 
-    public static class StringConfig extends ConfigEntry<String> {
-        public StringConfig(String key, Field field, String defaultValue) {
-            super(key, field, RuleType.STRING, defaultValue);
+    public static final class StringConfig extends ConfigEntry<String> {
+        private StringConfig(String key, Field field, String defaultValue, Class<?> configClass) {
+            super(key, field, RuleType.STRING, defaultValue, configClass);
         }
     }
 
-    public static class EnumConfig extends ConfigEntry<String> {
+    public static final class EnumConfig extends ConfigEntry<String> {
         public final List<String> allowedOptions;
 
-        public EnumConfig(String key, Field field, String defaultValue, List<String> allowedOptions) {
-            super(key, field, RuleType.ENUM, defaultValue);
+        private EnumConfig(String key, Field field, String defaultValue, List<String> allowedOptions, Class<?> configClass) {
+            super(key, field, RuleType.ENUM, defaultValue, configClass);
             this.allowedOptions = allowedOptions;
         }
 
         @Override
         public void set(String value) {
-            if (allowedOptions.isEmpty() || allowedOptions.contains(value))
+            if (allowedOptions.isEmpty() || allowedOptions.contains(value)) {
                 super.set(value);
-        }
-
-        public String next() {
-            int i = allowedOptions.indexOf(value);
-            if (i == -1 || allowedOptions.isEmpty()) return value;
-            return allowedOptions.get((i + 1) % allowedOptions.size());
+            }
         }
     }
 
-    public static class TableConfig extends ConfigEntry<Map<String, Object>> {
-        public TableConfig(String key, Field field, Map<String, Object> defaultValue) {
-            super(key, field, RuleType.TABLE, defaultValue);
+    public static final class TableConfig extends ConfigEntry<Map<String, Object>> {
+        private TableConfig(String key, Field field, Map<String, Object> defaultValue, Class<?> configClass) {
+            super(key, field, RuleType.TABLE, defaultValue, configClass);
         }
     }
 
     private static final Map<String, ConfigEntry<?>> CONFIGS = new LinkedHashMap<>();
+    private static final Map<Class<?>, Path> CONFIG_FILES = new LinkedHashMap<>();
+    private static final Path CONFIG_DIRECTORY = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("brokenstarsmp");
+    private static final Yaml YAML = createYaml();
+
+    private ConfigManager() {
+    }
 
     public static <T extends ConfigEntry<?>> T registerConfig(T entry) {
         CONFIGS.put(entry.key, entry);
         return entry;
     }
 
-    @SuppressWarnings("unchecked")
     public static void registerAnnotatedConfigs(Class<?> clazz) {
+        Path configFile = CONFIG_DIRECTORY.resolve(toFileName(clazz.getSimpleName()));
+        CONFIG_FILES.put(clazz, configFile);
+
         for (Field field : clazz.getDeclaredFields()) {
-            if (!field.isAnnotationPresent(Rule.class)) continue;
-            if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+            if (!field.isAnnotationPresent(Rule.class) || !Modifier.isStatic(field.getModifiers())) {
+                continue;
+            }
+
             field.setAccessible(true);
             try {
                 Object value = field.get(null);
-                ConfigEntry<?> entry = null;
-                String key = field.getName();
                 Rule annotation = field.getAnnotation(Rule.class);
-
-                if (value instanceof Boolean b) entry = new BoolConfig(key, field, b);
-                else if (value instanceof Integer i) entry = new IntConfig(key, field, i);
-                else if (value instanceof Double d) entry = new DoubleConfig(key, field, d);
-                else if (value instanceof String s) {
-                    if (annotation.options().length > 0)
-                        entry = new EnumConfig(key, field, s, List.of(annotation.options()));
-                    else entry = new StringConfig(key, field, s);
-                } else if (value instanceof Map<?, ?> map) entry = new TableConfig(key, field, (Map<String, Object>) map);
-
-                if (entry != null) registerConfig(entry);
-            } catch (IllegalAccessException ignored) {}
+                String key = annotation.name().isEmpty() ? field.getName() : annotation.name();
+                ConfigEntry<?> entry = createEntry(key, field, value, annotation, clazz);
+                if (entry != null) {
+                    registerConfig(entry);
+                }
+            } catch (IllegalAccessException exception) {
+                throw new IllegalStateException("Unable to read config field " + field.getName(), exception);
+            }
         }
+
+        loadConfig(clazz);
+        saveConfig(clazz);
+    }
+
+    public static void loadConfig(Class<?> clazz) {
+        Path path = getConfigFile(clazz);
+        if (!Files.exists(path)) {
+            return;
+        }
+
+        try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            Object loaded = YAML.load(reader);
+            if (!(loaded instanceof Map<?, ?> values)) {
+                throw new IllegalStateException("Config file must contain a YAML mapping: " + path);
+            }
+
+            for (ConfigEntry<?> entry : CONFIGS.values()) {
+                if (entry.configClass != clazz || !values.containsKey(entry.key)) {
+                    continue;
+                }
+
+                Object converted = convertValue(values.get(entry.key), entry.type);
+                applyValue(entry, converted);
+            }
+        } catch (IOException | RuntimeException exception) {
+            throw new IllegalStateException("Unable to load config " + path, exception);
+        }
+    }
+
+    public static void saveConfig(Class<?> clazz) {
+        Path path = getConfigFile(clazz);
+        try {
+            Files.createDirectories(path.getParent());
+            Map<String, Object> values = new LinkedHashMap<>();
+            for (ConfigEntry<?> entry : CONFIGS.values()) {
+                if (entry.configClass == clazz) {
+                    values.put(entry.key, entry.get());
+                }
+            }
+
+            try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+                YAML.dump(values, writer);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to save config " + path, exception);
+        }
+    }
+
+    public static void saveAll() {
+        for (Class<?> clazz : CONFIG_FILES.keySet()) {
+            saveConfig(clazz);
+        }
+    }
+
+    public static Path getConfigFile(Class<?> clazz) {
+        Path path = CONFIG_FILES.get(clazz);
+        if (path == null) {
+            throw new IllegalArgumentException("Config class is not registered: " + clazz.getName());
+        }
+        return path;
     }
 
     @SuppressWarnings("unchecked")
@@ -136,87 +211,78 @@ public class ConfigManager {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             var root = Commands.literal("brokenstarsmp");
 
-            root.executes(ctx -> {
+            root.executes(context -> {
                 for (ConfigEntry<?> entry : CONFIGS.values()) {
-                    Rule annotation = (entry.field != null) ? entry.field.getAnnotation(Rule.class) : null;
-                    String displayName = (annotation != null && !annotation.name().isEmpty()) ? annotation.name() : entry.key;
-                    String desc = (annotation != null) ? annotation.desc() : "No description";
+                    Rule annotation = entry.field.getAnnotation(Rule.class);
+                    String displayName = annotation.name().isEmpty() ? entry.key : annotation.name();
+                    String description = annotation.desc();
 
-                    if (entry instanceof BoolConfig boolEntry) {
-                        ctx.getSource().sendSuccess(() ->
-                                buildInteractiveRow(boolEntry, displayName, List.of("true", "false"), desc, displayName), false);
-                    } else if (entry instanceof EnumConfig enumEntry) {
-                        ctx.getSource().sendSuccess(() ->
-                                buildInteractiveRow(enumEntry, displayName, enumEntry.allowedOptions, desc, displayName), false);
+                    if (entry instanceof BoolConfig boolConfig) {
+                        context.getSource().sendSuccess(() -> buildInteractiveRow(boolConfig, displayName, List.of("true", "false"), description, displayName), false);
+                    } else if (entry instanceof EnumConfig enumConfig) {
+                        context.getSource().sendSuccess(() -> buildInteractiveRow(enumConfig, displayName, enumConfig.allowedOptions, description, displayName), false);
                     } else {
-                        ctx.getSource().sendSuccess(() ->
-                                Component.literal(displayName + " = ").withStyle(ChatFormatting.YELLOW)
-                                        .append(Component.literal(String.valueOf(entry.get())).withStyle(ChatFormatting.GREEN))
-                                        .append(Component.literal(" | " + desc).withStyle(ChatFormatting.GRAY)), false);
+                        context.getSource().sendSuccess(() -> Component.literal(displayName + " = ")
+                                .withStyle(ChatFormatting.YELLOW)
+                                .append(Component.literal(String.valueOf(entry.get())).withStyle(ChatFormatting.GREEN))
+                                .append(Component.literal(" | " + description).withStyle(ChatFormatting.GRAY)), false);
                     }
                 }
                 return Command.SINGLE_SUCCESS;
             });
 
             for (ConfigEntry<?> entry : CONFIGS.values()) {
-                Rule annotation = (entry.field != null) ? entry.field.getAnnotation(Rule.class) : null;
-                String commandName = (annotation != null && !annotation.name().isEmpty()) ? annotation.name() : entry.key;
+                Rule annotation = entry.field.getAnnotation(Rule.class);
+                String commandName = annotation.name().isEmpty() ? entry.key : annotation.name();
 
                 switch (entry.type) {
                     case BOOL -> root = root.then(Commands.literal(commandName)
                             .then(Commands.argument("value", BoolArgumentType.bool())
-                                    .executes(ctx -> {
-                                        boolean val = BoolArgumentType.getBool(ctx, "value");
-                                        ((ConfigEntry<Boolean>) entry).set(val);
-                                        ctx.getSource().sendSuccess(() ->
-                                                Component.literal(commandName + " set to ").withStyle(ChatFormatting.YELLOW)
-                                                        .append(Component.literal(String.valueOf(val)).withStyle(ChatFormatting.GREEN)), false);
+                                    .executes(context -> {
+                                        boolean value = BoolArgumentType.getBool(context, "value");
+                                        ((ConfigEntry<Boolean>) entry).set(value);
+                                        saveConfig(entry.configClass);
+                                        context.getSource().sendSuccess(() -> Component.literal(commandName + " set to ")
+                                                .withStyle(ChatFormatting.YELLOW)
+                                                .append(Component.literal(String.valueOf(value)).withStyle(ChatFormatting.GREEN)), false);
                                         return Command.SINGLE_SUCCESS;
                                     })));
                     case INT -> root = root.then(Commands.literal(commandName)
                             .then(Commands.argument("value", IntegerArgumentType.integer())
-                                    .executes(ctx -> {
-                                        int val = IntegerArgumentType.getInteger(ctx, "value");
-                                        ((ConfigEntry<Integer>) entry).set(val);
-                                        ctx.getSource().sendSuccess(() ->
-                                                Component.literal(commandName + " set to ").withStyle(ChatFormatting.YELLOW)
-                                                        .append(Component.literal(String.valueOf(val)).withStyle(ChatFormatting.GREEN)), false);
+                                    .executes(context -> {
+                                        int value = IntegerArgumentType.getInteger(context, "value");
+                                        ((ConfigEntry<Integer>) entry).set(value);
+                                        saveConfig(entry.configClass);
+                                        context.getSource().sendSuccess(() -> Component.literal(commandName + " set to ")
+                                                .withStyle(ChatFormatting.YELLOW)
+                                                .append(Component.literal(String.valueOf(value)).withStyle(ChatFormatting.GREEN)), false);
                                         return Command.SINGLE_SUCCESS;
                                     })));
                     case DOUBLE -> root = root.then(Commands.literal(commandName)
                             .then(Commands.argument("value", DoubleArgumentType.doubleArg())
-                                    .executes(ctx -> {
-                                        double val = DoubleArgumentType.getDouble(ctx, "value");
-                                        ((ConfigEntry<Double>) entry).set(val);
-                                        ctx.getSource().sendSuccess(() ->
-                                                Component.literal(commandName + " set to ").withStyle(ChatFormatting.YELLOW)
-                                                        .append(Component.literal(String.valueOf(val)).withStyle(ChatFormatting.GREEN)), false);
+                                    .executes(context -> {
+                                        double value = DoubleArgumentType.getDouble(context, "value");
+                                        ((ConfigEntry<Double>) entry).set(value);
+                                        saveConfig(entry.configClass);
+                                        context.getSource().sendSuccess(() -> Component.literal(commandName + " set to ")
+                                                .withStyle(ChatFormatting.YELLOW)
+                                                .append(Component.literal(String.valueOf(value)).withStyle(ChatFormatting.GREEN)), false);
                                         return Command.SINGLE_SUCCESS;
                                     })));
-                    case STRING -> root = root.then(Commands.literal(commandName)
+                    case STRING, ENUM -> root = root.then(Commands.literal(commandName)
                             .then(Commands.argument("value", StringArgumentType.string())
-                                    .executes(ctx -> {
-                                        String val = StringArgumentType.getString(ctx, "value");
-                                        ((ConfigEntry<String>) entry).set(val);
-                                        ctx.getSource().sendSuccess(() ->
-                                                Component.literal(commandName + " set to ").withStyle(ChatFormatting.YELLOW)
-                                                        .append(Component.literal(val).withStyle(ChatFormatting.GREEN)), false);
-                                        return Command.SINGLE_SUCCESS;
-                                    })));
-                    case ENUM -> root = root.then(Commands.literal(commandName)
-                            .then(Commands.argument("value", StringArgumentType.string())
-                                    .executes(ctx -> {
-                                        String val = StringArgumentType.getString(ctx, "value");
-                                        ((EnumConfig) entry).set(val);
-                                        ctx.getSource().sendSuccess(() ->
-                                                Component.literal(commandName + " set to ").withStyle(ChatFormatting.YELLOW)
-                                                        .append(Component.literal(val).withStyle(ChatFormatting.GREEN)), false);
+                                    .executes(context -> {
+                                        String value = StringArgumentType.getString(context, "value");
+                                        ((ConfigEntry<String>) entry).set(value);
+                                        saveConfig(entry.configClass);
+                                        context.getSource().sendSuccess(() -> Component.literal(commandName + " set to ")
+                                                .withStyle(ChatFormatting.YELLOW)
+                                                .append(Component.literal(value).withStyle(ChatFormatting.GREEN)), false);
                                         return Command.SINGLE_SUCCESS;
                                     })));
                     case TABLE -> root = root.then(Commands.literal(commandName)
-                            .executes(ctx -> {
-                                ctx.getSource().sendSuccess(() ->
-                                        Component.literal("Table configs must be modified programmatically").withStyle(ChatFormatting.RED), false);
+                            .executes(context -> {
+                                context.getSource().sendSuccess(() -> Component.literal("Table configs must be modified programmatically").withStyle(ChatFormatting.RED), false);
                                 return Command.SINGLE_SUCCESS;
                             }));
                 }
@@ -226,33 +292,125 @@ public class ConfigManager {
         });
     }
 
-    private static Component buildInteractiveRow(ConfigEntry<?> entry, String displayName, List<String> options, String description, String commandName) {
-        Component row = Component.literal("§e- " + displayName + " ").withStyle(ChatFormatting.YELLOW)
-                .append(Component.literal(description).withStyle(ChatFormatting.DARK_GREEN));
-
-        row = Component.literal(row.getString() + "\n§yOptions: "); // start options line
-
-        for (int i = 0; i < options.size(); i++) {
-            String option = options.get(i);
-            boolean isCurrent = entry.get().toString().equalsIgnoreCase(option);
-
-            ChatFormatting color = isCurrent ? ChatFormatting.GREEN : ChatFormatting.GRAY;
-            String bracketed = "[" + option + "]";
-
-            Component button = Component.literal(bracketed).withStyle(color)
-                    .withStyle(s -> s.withClickEvent(new ClickEvent.RunCommand("/brokenstarsmp " + commandName + " " + option))
-                            .withHoverEvent(new HoverEvent.ShowText(Component.literal("Click to set " + option))));
-
-            row = Component.literal(row.getString() + " ").append(button);
-
-            if (i < options.size() - 1) {
-                row = Component.literal(row.getString() + " ");
+    private static ConfigEntry<?> createEntry(String key, Field field, Object value, Rule annotation, Class<?> clazz) {
+        if (value instanceof Boolean booleanValue) {
+            return new BoolConfig(key, field, booleanValue, clazz);
+        }
+        if (value instanceof Integer integerValue) {
+            return new IntConfig(key, field, integerValue, clazz);
+        }
+        if (value instanceof Double doubleValue) {
+            return new DoubleConfig(key, field, doubleValue, clazz);
+        }
+        if (value instanceof String stringValue) {
+            if (annotation.options().length > 0) {
+                return new EnumConfig(key, field, stringValue, List.of(annotation.options()), clazz);
             }
+            return new StringConfig(key, field, stringValue, clazz);
+        }
+        if (value instanceof Map<?, ?> mapValue) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : mapValue.entrySet()) {
+                if (entry.getKey() instanceof String stringKey) {
+                    map.put(stringKey, entry.getValue());
+                }
+            }
+            return new TableConfig(key, field, map, clazz);
+        }
+        return null;
+    }
+
+    private static void applyValue(ConfigEntry<?> entry, Object value) {
+        switch (entry.type) {
+            case BOOL -> ((BoolConfig) entry).set((Boolean) value);
+            case INT -> ((IntConfig) entry).set((Integer) value);
+            case DOUBLE -> ((DoubleConfig) entry).set((Double) value);
+            case STRING, ENUM -> ((ConfigEntry<String>) entry).set((String) value);
+            case TABLE -> ((TableConfig) entry).set((Map<String, Object>) value);
+        }
+    }
+
+    private static Object convertValue(Object value, RuleType type) {
+        return switch (type) {
+            case BOOL -> {
+                if (!(value instanceof Boolean booleanValue)) {
+                    throw new IllegalArgumentException("Expected boolean but got " + value);
+                }
+                yield booleanValue;
+            }
+            case INT -> {
+                if (!(value instanceof Number number)) {
+                    throw new IllegalArgumentException("Expected number but got " + value);
+                }
+                yield number.intValue();
+            }
+            case DOUBLE -> {
+                if (!(value instanceof Number number)) {
+                    throw new IllegalArgumentException("Expected number but got " + value);
+                }
+                yield number.doubleValue();
+            }
+            case STRING, ENUM -> {
+                if (!(value instanceof String stringValue)) {
+                    throw new IllegalArgumentException("Expected string but got " + value);
+                }
+                yield stringValue;
+            }
+            case TABLE -> {
+                if (!(value instanceof Map<?, ?> mapValue)) {
+                    throw new IllegalArgumentException("Expected mapping but got " + value);
+                }
+                Map<String, Object> map = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : mapValue.entrySet()) {
+                    if (entry.getKey() instanceof String key) {
+                        map.put(key, entry.getValue());
+                    }
+                }
+                yield map;
+            }
+        };
+    }
+
+    private static Component buildInteractiveRow(ConfigEntry<?> entry, String displayName, List<String> options, String description, String commandName) {
+        Component row = Component.literal("- " + displayName + " ")
+                .withStyle(ChatFormatting.YELLOW)
+                .append(Component.literal(description).withStyle(ChatFormatting.DARK_GRAY));
+
+        row = row.append(Component.literal("\nOptions: ").withStyle(ChatFormatting.GRAY));
+
+        for (String option : options) {
+            boolean current = entry.get().toString().equalsIgnoreCase(option);
+            ChatFormatting color = current ? ChatFormatting.GREEN : ChatFormatting.GRAY;
+            Component button = Component.literal("[" + option + "]")
+                    .withStyle(color)
+                    .withStyle(style -> style
+                            .withClickEvent(new ClickEvent.RunCommand("/brokenstarsmp " + commandName + " " + option))
+                            .withHoverEvent(new HoverEvent.ShowText(Component.literal("Click to set " + option))));
+            row = row.append(Component.literal(" ")).append(button);
         }
 
-        Component descLine = Component.literal("\n§7Current value: ").withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(entry.get().toString()).withStyle(ChatFormatting.AQUA));
+        return row.append(Component.literal("\nCurrent value: ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(String.valueOf(entry.get())).withStyle(ChatFormatting.AQUA));
+    }
 
-        return Component.literal(row.getString()).append(descLine);
+    private static Yaml createYaml() {
+        DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        options.setPrettyFlow(true);
+        options.setIndent(2);
+        options.setWidth(120);
+        return new Yaml(new SafeConstructor(new LoaderOptions()), options);
+    }
+
+    private static String toFileName(String className) {
+        StringBuilder result = new StringBuilder();
+        for (int index = 0; index < className.length(); index++) {
+            char character = className.charAt(index);
+            if (Character.isUpperCase(character) && index > 0) {
+                result.append('-');
+            }
+            result.append(Character.toLowerCase(character));
+        }
+        return result + ".yml";
     }
 }
