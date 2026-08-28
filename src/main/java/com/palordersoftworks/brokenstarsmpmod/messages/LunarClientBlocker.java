@@ -17,6 +17,7 @@ public final class LunarClientBlocker {
             return false;
         }
 
+        Messages.initialize();
         listener.disconnect(MiniMessageApi.toNative(
                 Messages.render("kickScreen", Map.of("reason", REASON))
         ));
