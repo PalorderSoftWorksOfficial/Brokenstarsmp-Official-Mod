@@ -1,18 +1,26 @@
 package com.palordersoftworks.brokenstarsmpmod.commands;
 
+import com.mojang.logging.LogUtils;
 import java.lang.reflect.Method;
+import java.util.UUID;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.NameAndId;
+import org.slf4j.Logger;
 
 public class PermissionUtil {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final String IMMORTAL_PERMISSION = "unstablesmp.immortal";
+    // TODO: Set this to the actual owner UUID. Username-based checks are insecure
+    // because Minecraft usernames can change. Override via system property if needed.
+    private static final UUID OWNER_UUID = UUID.fromString(
+            System.getProperty("brokenstarsmp.owner-uuid", "00000000-0000-0000-0000-000000000000"));
 
     public static boolean isOwnerOrDev(CommandSourceStack source) {
         ServerPlayer player = source.getPlayer();
         if (player == null) return false;
 
-        return player.getName().equals("AdoreKittens");
+        return player.getUUID().equals(OWNER_UUID);
     }
 
     public static boolean hasImmortalPermission(CommandSourceStack source) {
@@ -41,7 +49,8 @@ public class PermissionUtil {
             if (result instanceof Boolean value) {
                 return value;
             }
-        } catch (ReflectiveOperationException | LinkageError ignored) {
+        } catch (ReflectiveOperationException | LinkageError e) {
+            LOGGER.debug("Fabric Permissions API not available, falling back to op check", e);
         }
 
         return fallback;

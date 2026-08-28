@@ -1,0 +1,13 @@
+services:
+  build:
+    image: eclipse-temurin:25-jdk
+    working_dir: /app
+    volumes:
+      - .:/app
+      - gradle-cache:/home/gradle/.gradle
+    command: ./gradlew build --no-daemon --stacktrace
+    environment:
+      - GRADLE_USER_HOME=/home/gradle/.gradle
+
+volumes:
+  gradle-cache:

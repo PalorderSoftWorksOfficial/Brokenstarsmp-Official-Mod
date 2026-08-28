@@ -37,12 +37,14 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
 
 import static com.palordersoftworks.brokenstarsmpmod.config.ServerRules.DROP_AT_FEET_RADIUS;
 
 
 public class DropAtFeet implements ModInitializer {
 
+    private static final Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
     public static final List<ScheduledTask> SCHEDULED_TASKS = new ArrayList<>();
     public static long serverTick;
 
@@ -107,7 +109,11 @@ public class DropAtFeet implements ModInitializer {
         );
 
 
-        final LuaScriptManager LUA = new LuaScriptManager();
+        try {
+            new LuaScriptManager();
+        } catch (RuntimeException e) {
+            LOGGER.warn("Lua script manager failed to initialize; Lua features disabled", e);
+        }
 
 
 

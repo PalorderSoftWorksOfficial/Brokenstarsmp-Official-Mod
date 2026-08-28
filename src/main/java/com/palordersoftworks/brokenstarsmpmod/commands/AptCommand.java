@@ -18,61 +18,50 @@ public final class AptCommand {
     private AptCommand() {
     }
 
+    @FunctionalInterface
+    private interface IoCommand {
+        int execute(CommandSourceStack source) throws IOException;
+    }
+
+    private static int handle(CommandSourceStack source, IoCommand command) {
+        try {
+            return command.execute(source);
+        } catch (IOException e) {
+            source.sendFailure(Component.literal("apt: " + e.getMessage()));
+            return 0;
+        }
+    }
+
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.CommandSelection environment) {
-        dispatcher.register(literal("apt")
-                .requires(PermissionUtil::isOwnerOrDev)
-                .then(literal("search")
-                        .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> {
-                                    try {
-                                        return search(context.getSource(), StringArgumentType.getString(context, "query"));
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                })))
-                .then(literal("install")
-                        .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> {
-                                    try {
-                                        return install(context.getSource(), StringArgumentType.getString(context, "query"));
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                })))
-                .then(literal("remove")
-                        .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> {
-                                    try {
-                                        return remove(context.getSource(), StringArgumentType.getString(context, "query"));
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                })))
-                .then(literal("update")
-                        .executes(context -> {
-                            try {
-                                return update(context.getSource());
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }))
-                .then(literal("list")
-                        .executes(context -> {
-                            try {
-                                return list(context.getSource());
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }))
-                .then(literal("info")
-                        .then(argument("query", StringArgumentType.greedyString())
-                                .executes(context -> {
-                                    try {
-                                        return info(context.getSource(), StringArgumentType.getString(context, "query"));
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                }))));
+        var apt = literal("apt").requires(PermissionUtil::isOwnerOrDev);
+
+        apt.then(literal("search")
+                .then(argument("query", StringArgumentType.greedyString())
+                        .executes(context -> handle(context.getSource(),
+                                src -> search(src, StringArgumentType.getString(context, "query"))))));
+
+        apt.then(literal("install")
+                .then(argument("query", StringArgumentType.greedyString())
+                        .executes(context -> handle(context.getSource(),
+                                src -> install(src, StringArgumentType.getString(context, "query"))))));
+
+        apt.then(literal("remove")
+                .then(argument("query", StringArgumentType.greedyString())
+                        .executes(context -> handle(context.getSource(),
+                                src -> remove(src, StringArgumentType.getString(context, "query"))))));
+
+        apt.then(literal("update")
+                .executes(context -> handle(context.getSource(), AptCommand::update)));
+
+        apt.then(literal("list")
+                .executes(context -> handle(context.getSource(), AptCommand::list)));
+
+        apt.then(literal("info")
+                .then(argument("query", StringArgumentType.greedyString())
+                        .executes(context -> handle(context.getSource(),
+                                src -> info(src, StringArgumentType.getString(context, "query"))))));
+
+        dispatcher.register(apt);
     }
 
     private static int search(CommandSourceStack source, String query) throws IOException {

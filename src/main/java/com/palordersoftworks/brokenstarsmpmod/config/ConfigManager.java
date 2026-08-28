@@ -28,6 +28,8 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ConfigManager {
     public static abstract class ConfigEntry<T> {
@@ -107,6 +109,7 @@ public final class ConfigManager {
         }
     }
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConfigManager.class);
     private static final Map<String, ConfigEntry<?>> CONFIGS = new LinkedHashMap<>();
     private static final Map<Class<?>, Path> CONFIG_FILES = new LinkedHashMap<>();
     private static final Path CONFIG_DIRECTORY = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("brokenstarsmp");
@@ -156,7 +159,8 @@ public final class ConfigManager {
         try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             Object loaded = YAML.load(reader);
             if (!(loaded instanceof Map<?, ?> values)) {
-                throw new IllegalStateException("Config file must contain a YAML mapping: " + path);
+                LOGGER.warn("Config file must contain a YAML mapping ({}); using defaults", path);
+                return;
             }
 
             for (ConfigEntry<?> entry : CONFIGS.values()) {
@@ -166,7 +170,7 @@ public final class ConfigManager {
                 applyValue(entry, convertValue(values.get(entry.key), entry.type));
             }
         } catch (IOException | RuntimeException exception) {
-            throw new IllegalStateException("Unable to load config " + path, exception);
+            LOGGER.warn("Unable to load config {}; using defaults", path, exception);
         }
     }
 
