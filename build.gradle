@@ -44,7 +44,6 @@ def grimVersion = resolveLatestGrimFabric()
 
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
     maven { url 'https://maven.nucleoid.xyz'}
     maven {
         name = 'GrimAC'
