@@ -1,0 +1,83 @@
+banChatMessage:
+  - '<dark_gray>[<red>Ban</red>]</dark_gray> <red>${banned}</red> has been permanently banned. <gray>Reason:</gray> <gold>${reason}</gold>'
+tempBanChatMessage:
+  - '<dark_gray>[<red>Ban</red>]</dark_gray> <red>${banned}</red> has been banned for <white>${expiration_time}</white>.'
+  - '<gray>Reason:</gray> <gold>${reason}</gold>'
+ipBanChatMessage:
+  - '<dark_gray>[<red>IP Ban</red>]</dark_gray> <red>${banned}</red> has been permanently IP banned. <gray>Reason:</gray> <gold>${reason}</gold>'
+tempIpBanChatMessage:
+  - '<dark_gray>[<red>IP Ban</red>]</dark_gray> <red>${banned}</red> has been IP banned for <white>${expiration_time}</white>.'
+  - '<gray>Reason:</gray> <gold>${reason}</gold>'
+muteChatMessage:
+  - '<dark_gray>[<yellow>Mute</yellow>]</dark_gray> <red>${banned}</red> has been muted. <gray>Reason:</gray> <gold>${reason}</gold>'
+tempMuteChatMessage:
+  - '<dark_gray>[<yellow>Mute</yellow>]</dark_gray> <red>${banned}</red> has been muted for <white>${expiration_time}</white>.'
+  - '<gray>Reason:</gray> <gold>${reason}</gold>'
+kickChatMessage:
+  - '<dark_gray>[<gold>Kick</gold>]</dark_gray> <red>${banned}</red> has been kicked. <gray>Reason:</gray> <gold>${reason}</gold>'
+warnChatMessage:
+  - '<dark_gray>[<yellow>Warning</yellow>]</dark_gray> <red>${banned}</red> has received a warning. <gray>Reason:</gray> <gold>${reason}</gold>'
+tempWarnChatMessage:
+  - '<dark_gray>[<yellow>Warning</yellow>]</dark_gray> <red>${banned}</red> has received a warning for <white>${expiration_time}</white>.'
+  - '<gray>Reason:</gray> <gold>${reason}</gold>'
+unbanChatMessage:
+  - '<dark_gray>[<green>Unban</green>]</dark_gray> <green>${banned}</green> has been unbanned. <gray>Reason:</gray> <gold>${reason}</gold>'
+ipUnbanChatMessage:
+  - '<dark_gray>[<green>IP Unban</green>]</dark_gray> <green>${banned}</green> has been IP unbanned. <gray>Reason:</gray> <gold>${reason}</gold>'
+unmuteChatMessage:
+  - '<dark_gray>[<green>Unmute</green>]</dark_gray> <green>${banned}</green> has been unmuted. <gray>Reason:</gray> <gold>${reason}</gold>'
+unwarnChatMessage:
+  - '<dark_gray>[<green>Warning Removed</green>]</dark_gray> <green>${banned}</green>''s warnings have been removed. <gray>Reason:</gray> <gold>${reason}</gold>'
+pardonChatMessage:
+  - '<dark_gray>[<green>Pardon</green>]</dark_gray> <green>${banned}</green>''s punishments have been pardoned. <gray>Reason:</gray> <gold>${reason}</gold>'
+banScreen:
+  - '<red>You are permanently banned from PalorderCentral!</red>'
+  - ''
+  - '<gray>Reason: </gray><gold>${reason}</gold>'
+  - ''
+  - '<gray>Date: </gray><gold>${expiration_date}</gold>'
+  - ''
+  - '<gray>Appeal: </gray><aqua><underline><url:''https://discord.gg/GB7MrEhR8v''>discord.gg/GB7MrEhR8v</url></underline></aqua>'
+tempBanScreen:
+  - '<red>You are banned for </red><white>${expiration_time}</white><red> from PalorderCentral!</red>'
+  - ''
+  - '<gray>Reason: </gray><gold>${reason}</gold>'
+  - ''
+  - '<gray>Expires: </gray><gold>${expiration_date}</gold>'
+  - ''
+  - '<gray>Appeal: </gray><aqua><underline><url:''https://discord.gg/GB7MrEhR8v''>discord.gg/GB7MrEhR8v</url></underline></aqua>'
+ipBanScreen:
+  - '<red>You are permanently IP banned from PalorderCentral!</red>'
+  - ''
+  - '<gray>Reason: </gray><gold>${reason}</gold>'
+  - ''
+  - '<gray>Date: </gray><gold>${expiration_date}</gold>'
+  - ''
+  - '<gray>Appeal: </gray><aqua><underline><url:''https://discord.gg/GB7MrEhR8v''>discord.gg/GB7MrEhR8v</url></underline></aqua>'
+tempIpBanScreen:
+  - '<red>You are IP banned for </red><white>${expiration_time}</white><red> from PalorderCentral!</red>'
+  - ''
+  - '<gray>Reason: </gray><gold>${reason}</gold>'
+  - ''
+  - '<gray>Expires: </gray><gold>${expiration_date}</gold>'
+  - ''
+  - '<gray>Appeal: </gray><aqua><underline><url:''https://discord.gg/GB7MrEhR8v''>discord.gg/GB7MrEhR8v</url></underline></aqua>'
+kickScreen:
+  - '<red>You have been kicked from PalorderCentral!</red>'
+  - ''
+  - '<gray>Reason: </gray><gold>${reason}</gold>'
+  - ''
+  - '<gray>Please resolve the issue before reconnecting.</gray>'
+mutedText:
+  - '<red>You are muted.</red> <gray>Reason: </gray><gold>${reason}</gold>'
+tempMutedText:
+  - '<red>You are muted for </red><white>${expiration_time}</white><red>.</red>'
+  - '<gray>Reason: </gray><gold>${reason}</gold>'
+defaultReason: 'Unspecified'
+dateFormat: 'dd.MM.yyyy'
+neverExpiresText: 'Never'
+yearsText: ' year(s) '
+daysText: ' day(s) '
+hoursText: ' hour(s) '
+minutesText: ' minute(s) '
+secondsText: ' second(s) '
