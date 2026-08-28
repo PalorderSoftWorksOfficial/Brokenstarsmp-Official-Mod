@@ -25,7 +25,6 @@ import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,7 +121,7 @@ public final class ConfigManager {
     }
 
     public static void registerAnnotatedConfigs(Class<?> clazz) {
-        Path configFile = CONFIG_DIRECTORY.resolve(toFileName(clazz.getSimpleName()));
+        Path configFile = CONFIG_DIRECTORY.resolve(toFileName(clazz));
         CONFIG_FILES.put(clazz, configFile);
 
         for (Field field : clazz.getDeclaredFields()) {
@@ -164,9 +163,7 @@ public final class ConfigManager {
                 if (entry.configClass != clazz || !values.containsKey(entry.key)) {
                     continue;
                 }
-
-                Object converted = convertValue(values.get(entry.key), entry.type);
-                applyValue(entry, converted);
+                applyValue(entry, convertValue(values.get(entry.key), entry.type));
             }
         } catch (IOException | RuntimeException exception) {
             throw new IllegalStateException("Unable to load config " + path, exception);
@@ -310,9 +307,9 @@ public final class ConfigManager {
         }
         if (value instanceof Map<?, ?> mapValue) {
             Map<String, Object> map = new LinkedHashMap<>();
-            for (Map.Entry<?, ?> entry : mapValue.entrySet()) {
-                if (entry.getKey() instanceof String stringKey) {
-                    map.put(stringKey, entry.getValue());
+            for (Map.Entry<?, ?> mapEntry : mapValue.entrySet()) {
+                if (mapEntry.getKey() instanceof String stringKey) {
+                    map.put(stringKey, mapEntry.getValue());
                 }
             }
             return new TableConfig(key, field, map, clazz);
@@ -320,6 +317,7 @@ public final class ConfigManager {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     private static void applyValue(ConfigEntry<?> entry, Object value) {
         switch (entry.type) {
             case BOOL -> ((BoolConfig) entry).set((Boolean) value);
@@ -361,9 +359,9 @@ public final class ConfigManager {
                     throw new IllegalArgumentException("Expected mapping but got " + value);
                 }
                 Map<String, Object> map = new LinkedHashMap<>();
-                for (Map.Entry<?, ?> entry : mapValue.entrySet()) {
-                    if (entry.getKey() instanceof String key) {
-                        map.put(key, entry.getValue());
+                for (Map.Entry<?, ?> mapEntry : mapValue.entrySet()) {
+                    if (mapEntry.getKey() instanceof String key) {
+                        map.put(key, mapEntry.getValue());
                     }
                 }
                 yield map;
@@ -402,7 +400,15 @@ public final class ConfigManager {
         return new Yaml(new SafeConstructor(new LoaderOptions()), options);
     }
 
-    private static String toFileName(String className) {
+    private static String toFileName(Class<?> clazz) {
+        if (clazz == ServerRules.class) {
+            return "server-rules.yml";
+        }
+        if (clazz == UnstableSMPRules.class) {
+            return "unstable-smp.yml";
+        }
+
+        String className = clazz.getSimpleName();
         StringBuilder result = new StringBuilder();
         for (int index = 0; index < className.length(); index++) {
             char character = className.charAt(index);
