@@ -1,12 +1,13 @@
 package com.palordersoftworks.brokenstarsmpmod.translationprobe;
 
+import ac.grim.grimac.api.AbstractCheck;
 import ac.grim.grimac.api.GrimAbstractAPI;
 import ac.grim.grimac.api.GrimAPIProvider;
-import ac.grim.grimac.api.AbstractCheck;
 import ac.grim.grimac.api.GrimUser;
 import ac.grim.grimac.api.event.events.FlagEvent;
 import ac.grim.grimac.api.plugin.GrimPlugin;
 import com.mojang.logging.LogUtils;
+import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,19 +15,16 @@ import org.slf4j.Logger;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
-public final class GrimIntegration {
+public final class GrimIntegration implements ModInitializer {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ConcurrentHashMap<UUID, Long> LAST_PROBE = new ConcurrentHashMap<>();
     private static volatile MinecraftServer server;
     private static volatile GrimPlugin plugin;
     private static volatile boolean registered;
 
-    private GrimIntegration() {
-    }
-
-    public static void register() {
+    @Override
+    public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTED.register(GrimIntegration::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(GrimIntegration::onServerStopping);
     }
@@ -81,6 +79,8 @@ public final class GrimIntegration {
                     LAST_PROBE.remove(uuid, now);
                 }
             });
+        } else {
+            LAST_PROBE.remove(uuid, now);
         }
 
         return cancelled;
