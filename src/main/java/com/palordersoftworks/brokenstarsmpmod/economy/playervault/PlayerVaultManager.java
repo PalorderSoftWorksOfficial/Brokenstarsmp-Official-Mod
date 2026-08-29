@@ -33,6 +33,8 @@ public final class PlayerVaultManager {
     private final Map<UUID, Map<Integer, SimpleContainer>> cache = new HashMap<>();
     private final Map<UUID, Integer> unlockedCounts = new HashMap<>();
     private final Map<UUID, Map<Integer, String>> vaultNames = new HashMap<>();
+    private volatile boolean dirty;
+    private volatile long lastSaveTick;
 
     public PlayerVaultManager(MinecraftServer server) {
         this.server = server;
@@ -50,7 +52,7 @@ public final class PlayerVaultManager {
         cache.remove(id);
         unlockedCounts.remove(id);
         vaultNames.remove(id);
-        save();
+        markDirty();
     }
 
     public Set<UUID> getTrackedPlayers() {
@@ -70,7 +72,7 @@ public final class PlayerVaultManager {
         for (int i = 0; i < vault.getContainerSize(); i++) {
             vault.setItem(i, ItemStack.EMPTY);
         }
-        save();
+        markDirty();
     }
 
     public void deleteVault(UUID owner, int vaultIndex) {
@@ -89,7 +91,7 @@ public final class PlayerVaultManager {
         if (vaultIndex >= unlocked) {
             unlockedCounts.put(owner, Math.max(1, unlocked - 1));
         }
-        save();
+        markDirty();
     }
 
     public void clearAllVaults(UUID owner) {
@@ -102,7 +104,7 @@ public final class PlayerVaultManager {
                 }
             }
         }
-        save();
+        markDirty();
     }
 
     public String getVaultName(UUID owner, int vaultIndex) {
@@ -126,7 +128,7 @@ public final class PlayerVaultManager {
             names.put(vaultIndex, trimmed);
         }
         if (names.isEmpty()) vaultNames.remove(owner);
-        save();
+        markDirty();
     }
 
     public int getUnlockedVaultCount(UUID owner, int allowedMax) {
@@ -143,7 +145,7 @@ public final class PlayerVaultManager {
         if (unlocked >= Math.max(0, allowedMax)) return unlocked;
         int next = unlocked + 1;
         unlockedCounts.put(owner, next);
-        save();
+        markDirty();
         return next;
     }
 
@@ -163,13 +165,25 @@ public final class PlayerVaultManager {
             resized.setItem(i, existing.getItem(i).copy());
         }
         forPlayer.put(vaultIndex, resized);
-        save();
+        markDirty();
         return resized;
+    }
+
+    private void markDirty() {
+        dirty = true;
+    }
+
+    public void flushIfNeeded(long currentTick) {
+        if (dirty && currentTick - lastSaveTick >= 200) {
+            save();
+        }
     }
 
     public void save() {
         try {
             var ops = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
+            dirty = false;
+            lastSaveTick = server.getTickCount();
             JsonObject root = new JsonObject();
             for (UUID playerId : getTrackedPlayers()) {
                 JsonObject playerObj = new JsonObject();

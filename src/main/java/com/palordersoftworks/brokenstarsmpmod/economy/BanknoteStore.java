@@ -37,15 +37,19 @@ public final class BanknoteStore {
         if (!redeemed.add(signature)) {
             return false;
         }
-        save();
+        if (!save()) {
+            LOGGER.error("[BrokenStars] CRITICAL: banknote signature {} was marked redeemed in memory but could not be persisted; potential dupe risk on restart", signature);
+        }
         return true;
     }
 
-    public synchronized void save() {
+    public synchronized boolean save() {
         try {
             Files.writeString(file, GSON.toJson(redeemed), StandardCharsets.UTF_8);
+            return true;
         } catch (IOException e) {
             LOGGER.error("[BrokenStars] Failed to save banknote signatures", e);
+            return false;
         }
     }
 

@@ -6,6 +6,7 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
+import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -18,9 +19,11 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
 
 public final class Messages {
     private static final Path CONFIG_DIRECTORY = FabricLoader.getInstance().getConfigDir().resolve("brokenstarsmp");
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Path FILE = CONFIG_DIRECTORY.resolve("messages.yml");
     private static final Path LEGACY_FILE = CONFIG_DIRECTORY.resolve("messages.json");
     private static final Map<String, List<String>> MESSAGES = new LinkedHashMap<>();
@@ -43,9 +46,10 @@ public final class Messages {
                 } else {
                     try (InputStream input = Messages.class.getClassLoader().getResourceAsStream("messages.yml")) {
                         if (input == null) {
-                            throw new IOException("messages.yml is missing from the mod jar");
+                            LOGGER.warn("messages.yml is missing from the mod jar; using empty defaults");
+                        } else {
+                            Files.copy(input, FILE);
                         }
-                        Files.copy(input, FILE);
                     }
                 }
             }

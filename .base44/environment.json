@@ -1,0 +1,7 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml run --rm build",
+  "secrets": [],
+  "note": "This is a Minecraft Fabric mod, not a web application. There is no web preview. The build command compiles the mod JAR via Gradle."
+}

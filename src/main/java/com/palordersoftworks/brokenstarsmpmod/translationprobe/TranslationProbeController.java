@@ -123,7 +123,8 @@ public final class TranslationProbeController {
                     return true;
                 }
             }
-        } catch (IllegalStateException ignored) {
+        } catch (IllegalStateException e) {
+            LOGGER.debug("LuckPerms not available for exemption check", e);
         }
 
         return false;

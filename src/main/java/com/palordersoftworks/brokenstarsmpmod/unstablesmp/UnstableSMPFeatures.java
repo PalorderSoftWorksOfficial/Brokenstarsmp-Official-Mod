@@ -100,7 +100,10 @@ public final class UnstableSMPFeatures {
 
         String reason = UnstableSMPRules.DEATH_BAN_REASON;
         String escaped = reason.replace("\\", "\\\\").replace("\"", "\\\"");
-        server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "ban " + victim.getGameProfile().name() + " \"" + escaped + "\"");
+        server.getCommands().performPrefixedCommand(
+                server.createCommandSourceStack().withSuppressedOutput(),
+                "ban " + victim.getUUID() + " \"" + escaped + "\""
+        );
         victim.connection.disconnect(Component.literal(reason));
     }
 }

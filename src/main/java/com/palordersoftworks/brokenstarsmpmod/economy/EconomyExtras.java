@@ -9,6 +9,7 @@ import com.reazip.economycraft.EconomyCraft;
 import com.reazip.economycraft.EconomyManager;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
@@ -41,6 +42,12 @@ public final class EconomyExtras {
             vaults = null;
             banknotes = null;
             boundServer = null;
+        });
+
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (vaults != null) {
+                vaults.flushIfNeeded(server.getTickCount());
+            }
         });
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
