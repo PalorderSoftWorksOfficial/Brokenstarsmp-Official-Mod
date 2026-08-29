@@ -50,35 +50,37 @@ public final class TranslationProbeCommands {
                                     .then(argument("player", EntityArgument.player())
                                             .executes(ctx -> {
                                                 ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
-                                                TranslationProbeController.startPlayerCheck(
+                                                boolean started = TranslationProbeController.startPlayerCheckManual(
                                                         target,
                                                         ctx.getSource().getServer(),
-                                                        (String) null
+                                                        null
                                                 );
                                                 ctx.getSource().sendSuccess(
-                                                        () -> Component.literal("[CheckHacks] Started group check for "
-                                                                        + target.getName().getString())
-                                                                .withStyle(ChatFormatting.GRAY),
+                                                        () -> Component.literal(started
+                                                                        ? "[CheckHacks] Started manual group check for " + target.getName().getString()
+                                                                        : "[CheckHacks] Could not start group check for " + target.getName().getString())
+                                                                .withStyle(started ? ChatFormatting.GREEN : ChatFormatting.RED),
                                                         true
                                                 );
-                                                return 1;
+                                                return started ? 1 : 0;
                                             })
                                             .then(argument("hackId", StringArgumentType.word())
                                                     .executes(ctx -> {
                                                         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
                                                         String id = StringArgumentType.getString(ctx, "hackId");
-                                                        TranslationProbeController.startPlayerCheck(
+                                                        boolean started = TranslationProbeController.startPlayerCheckManual(
                                                                 target,
                                                                 ctx.getSource().getServer(),
                                                                 id
                                                         );
                                                         ctx.getSource().sendSuccess(
-                                                                () -> Component.literal("[CheckHacks] Started single hack "
-                                                                        + id + " for " + target.getName().getString())
-                                                                        .withStyle(ChatFormatting.GRAY),
+                                                                () -> Component.literal(started
+                                                                                ? "[CheckHacks] Started manual single hack " + id + " for " + target.getName().getString()
+                                                                                : "[CheckHacks] Could not start single hack " + id + " for " + target.getName().getString())
+                                                                        .withStyle(started ? ChatFormatting.GREEN : ChatFormatting.RED),
                                                                 true
                                                         );
-                                                        return 1;
+                                                        return started ? 1 : 0;
                                                     }))))
                             .then(literal("status")
                                     .executes(ctx -> {
