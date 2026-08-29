@@ -124,6 +124,10 @@ processResources {
 
 loom {
     accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
+
+    interfaceInjection {
+        enableDependencyInterfaceInjection = false
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {
