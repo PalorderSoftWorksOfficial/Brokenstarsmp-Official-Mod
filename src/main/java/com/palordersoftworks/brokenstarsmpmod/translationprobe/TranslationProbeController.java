@@ -331,25 +331,36 @@ public final class TranslationProbeController {
         startPlayerCheck(player, server, (List<String>) null);
     }
 
+    public static boolean startPlayerCheckManual(ServerPlayer player, MinecraftServer server, String singleHackIdOrNull) {
+        if (singleHackIdOrNull != null && !singleHackIdOrNull.isBlank()) {
+            return startPlayerCheckInternal(player, server, List.of(singleHackIdOrNull.trim()), true);
+        }
+        return startPlayerCheckInternal(player, server, null, true);
+    }
+
     public static void startPlayerCheck(ServerPlayer player, MinecraftServer server, List<String> hackIdsOrNull) {
+        startPlayerCheckInternal(player, server, hackIdsOrNull, false);
+    }
+
+    private static boolean startPlayerCheckInternal(ServerPlayer player, MinecraftServer server, List<String> hackIdsOrNull, boolean bypassExemptions) {
         if (!probesActive()) {
-            LOGGER.debug("[BrokenStarSMP/CheckHacks] skip player={} (probes off)", player.getName().getString());
-            return;
+            LOGGER.warn("[BrokenStarSMP/CheckHacks] cannot start player={} (probes disabled)", player.getName().getString());
+            return false;
         }
 
         if (isBedrockPlayer(player)) {
             LOGGER.debug("[BrokenStarSMP/CheckHacks] skip player={} (bedrock prefix)", player.getName().getString());
-            return;
+            return false;
         }
 
-        if (isProbeExempt(player)) {
+        if (!bypassExemptions && isProbeExempt(player)) {
             LOGGER.debug("[BrokenStarSMP/CheckHacks] skip player={} (exempt)", player.getName().getString());
-            return;
+            return false;
         }
 
         if (RUNS.containsKey(player.getUUID())) {
-            LOGGER.debug("[BrokenStarSMP/CheckHacks] skip player={} (run active)", player.getName().getString());
-            return;
+            LOGGER.warn("[BrokenStarSMP/CheckHacks] cannot start player={} (run active)", player.getName().getString());
+            return false;
         }
 
         CheckHacksConfig cfg = fileConfig;
@@ -368,18 +379,24 @@ public final class TranslationProbeController {
 
         if (queue.isEmpty()) {
             LOGGER.warn("[BrokenStarSMP/CheckHacks] empty queue for {}", player.getName().getString());
-            return;
+            return false;
         }
 
         List<List<HackRegistryEntry>> batches = buildBatches(queue);
         if (batches.isEmpty()) {
             LOGGER.warn("[BrokenStarSMP/CheckHacks] no valid hacks for {}", player.getName().getString());
-            return;
+            return false;
         }
 
         CheckRun run = new CheckRun(batches);
         RUNS.put(player.getUUID(), run);
+        LOGGER.info("[BrokenStarSMP/CheckHacks] {} check started for {} batches={} manual={}",
+                bypassExemptions ? "Manual" : "Automatic",
+                player.getName().getString(),
+                batches.size(),
+                bypassExemptions);
         openBatch(player, server, run);
+        return true;
     }
 
     private static List<List<HackRegistryEntry>> buildBatches(List<String> hackIds) {
