@@ -1,0 +1,8 @@
+name: BrokenstarSMP
+version: '${version}'
+main: com.palordersoftworks.brokenstarsmpmod.BrokenstarSMPPlugin
+api-version: '1.21'
+description: The brokenstarsmp QOL mod (Paper port)
+authors:
+  - PalorderSoftWorks
+website: https://mc.brokenstarsmp.palorderhosting.net

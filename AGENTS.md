@@ -40,6 +40,24 @@ Uses `eclipse-temurin:25-jdk`. Gradle wrapper is 9.5.1. Fabric Loom downloads Mi
 - **PlayerVaultManager.save()**: Uses `server.registryAccess()` which may fail during abnormal shutdown. (Stage 3)
 - **No automated tests**: Project has no test source set. (Stage 15)
 
+## Supported Platforms
+- **Fabric 26.2** (root project) — full mod with mixins, economy, translation probe, Lua scripting, GrimAC
+- **Paper 26.2** (`paper/` subproject, `includeBuild`) — Paper plugin port using paperweight userdev, Mojang production mappings
+
+## Removed Platforms (cleanup Aug 2026)
+- `fabric-26.1.2/` — below 26.2, deleted
+- `fabric-template/` — below 26.2, deleted
+- `spigot/` — removed, replaced by Paper
+- `quilt-1.21.11/` — below 26.2, deleted
+
+## Paper Port (`paper/` subproject)
+- Uses `io.papermc.paperweight.userdev` 2.0.0-beta.21 with dev bundle `26.2.build.+`
+- Mojang production reobf configuration (Paper 1.20.5+ can load Mojang-mapped jars directly)
+- Build: `docker compose -f docker-compose.base44.yml run --rm build ./gradlew -p paper build`
+- Output: `paper/build/libs/brokenstarsmp-paper-2.0.0-26.2.jar`
+- **Ported**: ConfigManager (annotation-driven YAML config), ServerRules/UnstableSMPRules, Messages/MiniMessageApi, ImmortalCommand, event listeners (fire spread, leaf decay, drop-at-feet, item merge, proximity messages, death ban, wither sound)
+- **Not yet ported**: Economy (EconomyCraft dependency), Translation probe (GrimAC integration), Lua scripting, Modrinth package manager, Polymer/SGUI UI, remaining mixins (furnace speed, chest opening, hopper, dispenser, beehive, crafter, cobblestone ore, entity tick budget, mob AI, projectile lifetime, XP orb range/split)
+
 ## Key Dependencies
 - `economycraft` (required at runtime — economy API)
 - GrimAPI (compileOnly), GrimAC (nested JAR from Modrinth)
