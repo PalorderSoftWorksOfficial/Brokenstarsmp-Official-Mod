@@ -3,7 +3,6 @@ package com.palordersoftworks.brokenstarsmpmod.translationprobe;
 import com.mojang.logging.LogUtils;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
-import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -19,8 +18,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.Level;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.permissions.Permission;
-import net.minecraft.server.permissions.PermissionLevel;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -28,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class TranslationProbeController {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final String EXEMPT_PERMISSION = "brokenstarsmp.checkhacks.exempt";
     private static final int LINES_PER_SIGN = 3;
 
     private static volatile CheckHacksConfig fileConfig = CheckHacksConfig.createDefaultRegistry();
@@ -92,37 +90,13 @@ public final class TranslationProbeController {
             return false;
         }
 
-        if (player.createCommandSourceStack().permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(2)))) {
-            return true;
-        }
-
-        final Set<String> exemptGroups = Set.of(
-                "moderator",
-                "contentcreator",
-                "administrator",
-                "developers",
-                "manager",
-                "owner"
-        );
-
         try {
             LuckPerms lp = LuckPermsProvider.get();
             User user = lp.getUserManager().getUser(player.getUUID());
             if (user == null) {
                 return false;
             }
-
-            String primary = user.getPrimaryGroup();
-            if (primary != null && exemptGroups.contains(primary.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-
-            for (Group group : user.getInheritedGroups(user.getQueryOptions())) {
-                String name = group.getName();
-                if (name != null && exemptGroups.contains(name.toLowerCase(Locale.ROOT))) {
-                    return true;
-                }
-            }
+            return user.getCachedData().getPermissionData(user.getQueryOptions()).checkPermission(EXEMPT_PERMISSION).asBoolean();
         } catch (IllegalStateException e) {
             LOGGER.debug("LuckPerms not available for exemption check", e);
         }
