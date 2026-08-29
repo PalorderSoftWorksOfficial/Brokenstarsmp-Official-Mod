@@ -86,8 +86,8 @@ dependencies {
     compileOnly "ac.grim.grimac:grim-internal:1.6.0.9"
     compileOnly "ac.grim.grimac:grim-fabric-internal:1.6.0.9"
 
-    implementation files("libs/grimac-fabric-2.3.74-58c8b92.jar")
-    grimNested files("libs/grimac-fabric-2.3.74-58c8b92.jar")
+    implementation files("libs/grimac-fabric.jar")
+    grimNested files("libs/grimac-fabric.jar")
 
     implementation "net.fabricmc:fabric-language-kotlin:1.13.9+"
 
