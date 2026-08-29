@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,8 +31,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class ModrinthPackageManager {
+    private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(20);
     private static final URI API_BASE = URI.create("https://api.modrinth.com/v2/");
-    private static final HttpClient CLIENT = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+    private static final HttpClient CLIENT = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(HTTP_TIMEOUT).build();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path MODS_DIR = FabricLoader.getInstance().getGameDir().resolve("mods");
     private static final Path MANIFEST_FILE = MODS_DIR.resolve(".brokenstarsmp-apt.json");
@@ -230,7 +232,7 @@ public final class ModrinthPackageManager {
             Path target = MODS_DIR.resolve(version.filename());
             Path temp = Files.createTempFile(MODS_DIR, "modrinth-", ".part");
             HttpResponse<Path> response = CLIENT.send(
-                    HttpRequest.newBuilder(version.downloadUri()).GET().build(),
+                    HttpRequest.newBuilder(version.downloadUri()).timeout(HTTP_TIMEOUT).GET().build(),
                     HttpResponse.BodyHandlers.ofFile(temp)
             );
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -320,11 +322,10 @@ public final class ModrinthPackageManager {
 
     private static HttpResponse<String> request(URI uri) throws IOException {
         try {
-            HttpResponse<String> response = CLIENT.send(HttpRequest.newBuilder(uri).GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                return response;
-            }
-            return response;
+            return CLIENT.send(
+                    HttpRequest.newBuilder(uri).timeout(HTTP_TIMEOUT).GET().build(),
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+            );
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IOException("Modrinth request interrupted", exception);
