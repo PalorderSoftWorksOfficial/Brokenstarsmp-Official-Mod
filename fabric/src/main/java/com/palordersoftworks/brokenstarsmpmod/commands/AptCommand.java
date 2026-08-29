@@ -5,6 +5,8 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.palordersoftworks.brokenstarsmpmod.modrinth.ModrinthPackageManager;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
@@ -15,21 +17,32 @@ import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 
 public final class AptCommand {
+    private static final ExecutorService IO_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "BrokenStarSMP-apt");
+        thread.setDaemon(true);
+        return thread;
+    });
+
     private AptCommand() {
     }
 
     @FunctionalInterface
     private interface IoCommand {
-        int execute(CommandSourceStack source) throws IOException;
+        void execute(CommandSourceStack source) throws IOException;
     }
 
     private static int handle(CommandSourceStack source, IoCommand command) {
-        try {
-            return command.execute(source);
-        } catch (IOException e) {
-            source.sendFailure(Component.literal("apt: " + e.getMessage()));
-            return 0;
-        }
+        IO_EXECUTOR.execute(() -> {
+            try {
+                command.execute(source);
+            } catch (IOException e) {
+                source.getServer().execute(() -> source.sendFailure(Component.literal("apt: " + e.getMessage())));
+            } catch (RuntimeException e) {
+                source.getServer().execute(() -> source.sendFailure(Component.literal("apt: " + e.getMessage())));
+            }
+        });
+        source.sendSuccess(() -> Component.literal("apt: operation started"), false);
+        return 1;
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.CommandSelection environment) {
@@ -64,73 +77,79 @@ public final class AptCommand {
         dispatcher.register(apt);
     }
 
-    private static int search(CommandSourceStack source, String query) throws IOException {
+    private static void search(CommandSourceStack source, String query) throws IOException {
         List<ModrinthPackageManager.SearchHit> hits = ModrinthPackageManager.search(query);
-        if (hits.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("No results for: " + query), false);
-            return 0;
-        }
+        source.getServer().execute(() -> {
+            if (hits.isEmpty()) {
+                source.sendSuccess(() -> Component.literal("No results for: " + query), false);
+                return;
+            }
 
-        String summary = hits.stream()
-                .map(hit -> hit.title() + " by " + hit.author() + " [" + hit.slug() + "]")
-                .collect(Collectors.joining(" | "));
-        source.sendSuccess(() -> Component.literal(summary), false);
-        return hits.size();
+            String summary = hits.stream()
+                    .map(hit -> hit.title() + " by " + hit.author() + " [" + hit.slug() + "]")
+                    .collect(Collectors.joining(" | "));
+            source.sendSuccess(() -> Component.literal(summary), false);
+        });
     }
 
-    private static int install(CommandSourceStack source, String query) throws IOException {
+    private static void install(CommandSourceStack source, String query) throws IOException {
         ModrinthPackageManager.InstallResult result = ModrinthPackageManager.install(query);
-        source.sendSuccess(() -> Component.literal("Installed " + result.title() + " " + result.versionNumber() + " as " + result.path().getFileName()), false);
-        return 1;
+        source.getServer().execute(() -> source.sendSuccess(() -> Component.literal(
+                "Installed " + result.title() + " " + result.versionNumber() + " as " + result.path().getFileName()), false));
     }
 
-    private static int remove(CommandSourceStack source, String query) throws IOException {
+    private static void remove(CommandSourceStack source, String query) throws IOException {
         boolean removed = ModrinthPackageManager.remove(query);
-        if (removed) {
-            source.sendSuccess(() -> Component.literal("Removed package: " + query), false);
-            return 1;
-        }
-        source.sendFailure(Component.literal("No installed package matched: " + query));
-        return 0;
+        source.getServer().execute(() -> {
+            if (removed) {
+                source.sendSuccess(() -> Component.literal("Removed package: " + query), false);
+            } else {
+                source.sendFailure(Component.literal("No installed package matched: " + query));
+            }
+        });
     }
 
-    private static int update(CommandSourceStack source) throws IOException {
+    private static void update(CommandSourceStack source) throws IOException {
         List<ModrinthPackageManager.UpdateResult> updates = ModrinthPackageManager.updateAll();
-        if (updates.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("No package updates available"), false);
-            return 0;
-        }
+        source.getServer().execute(() -> {
+            if (updates.isEmpty()) {
+                source.sendSuccess(() -> Component.literal("No package updates available"), false);
+                return;
+            }
 
-        String summary = updates.stream()
-                .map(update -> update.title() + " " + update.oldVersion() + " -> " + update.newVersion())
-                .collect(Collectors.joining(" | "));
-        source.sendSuccess(() -> Component.literal(summary), false);
-        return updates.size();
+            String summary = updates.stream()
+                    .map(update -> update.title() + " " + update.oldVersion() + " -> " + update.newVersion())
+                    .collect(Collectors.joining(" | "));
+            source.sendSuccess(() -> Component.literal(summary), false);
+        });
     }
 
-    private static int list(CommandSourceStack source) throws IOException {
+    private static void list(CommandSourceStack source) throws IOException {
         List<ModrinthPackageManager.InstalledPackage> installed = ModrinthPackageManager.listInstalled();
-        if (installed.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("No apt packages installed"), false);
-            return 0;
-        }
+        source.getServer().execute(() -> {
+            if (installed.isEmpty()) {
+                source.sendSuccess(() -> Component.literal("No apt packages installed"), false);
+                return;
+            }
 
-        String summary = installed.stream()
-                .map(pkg -> pkg.title() + " " + pkg.versionNumber())
-                .collect(Collectors.joining(" | "));
-        source.sendSuccess(() -> Component.literal(summary), false);
-        return installed.size();
+            String summary = installed.stream()
+                    .map(pkg -> pkg.title() + " " + pkg.versionNumber())
+                    .collect(Collectors.joining(" | "));
+            source.sendSuccess(() -> Component.literal(summary), false);
+        });
     }
 
-    private static int info(CommandSourceStack source, String query) throws IOException {
+    private static void info(CommandSourceStack source, String query) throws IOException {
         List<ModrinthPackageManager.SearchHit> hits = ModrinthPackageManager.search(query);
-        if (hits.isEmpty()) {
-            source.sendFailure(Component.literal("No Modrinth project found for: " + query));
-            return 0;
-        }
+        source.getServer().execute(() -> {
+            if (hits.isEmpty()) {
+                source.sendFailure(Component.literal("No Modrinth project found for: " + query));
+                return;
+            }
 
-        ModrinthPackageManager.SearchHit hit = hits.get(0);
-        source.sendSuccess(() -> Component.literal(hit.title() + " | " + hit.slug() + " | " + hit.author() + " | " + hit.description()), false);
-        return 1;
+            ModrinthPackageManager.SearchHit hit = hits.get(0);
+            source.sendSuccess(() -> Component.literal(
+                    hit.title() + " | " + hit.slug() + " | " + hit.author() + " | " + hit.description()), false);
+        });
     }
 }
