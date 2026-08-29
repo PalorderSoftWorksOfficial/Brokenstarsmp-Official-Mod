@@ -1,291 +1,68 @@
-buildscript {
+plugins {
+    id 'base'
+}
+
+group = project.maven_group
+version = project.mod_version
+
+def rootLibs = rootProject.layout.buildDirectory.dir('libs')
+
+allprojects {
+    group = rootProject.maven_group
+    version = rootProject.mod_version
+
     repositories {
         mavenCentral()
-    }
-    dependencies {
-        classpath "org.apache.httpcomponents.client5:httpclient5:5.6.1"
-        classpath "org.apache.jackrabbit:jackrabbit-webdav:2.22.3"
-    }
-}
-
-plugins {
-    id 'net.fabricmc.fabric-loom' version "${loom_version}"
-    id 'maven-publish'
-    id 'org.jetbrains.kotlin.jvm' version '2.3.10'
-    id("com.gradleup.shadow") version "9.4.1"
-}
-
-base {
-    archivesName = project.archives_base_name
-}
-
-version = project.mod_version
-group = project.maven_group
-
-repositories {
-    mavenCentral()
-
-    maven {
-        url 'https://maven.nucleoid.xyz'
-    }
-
-    maven {
-        name = 'GrimAC'
-        url = 'https://repo.grim.ac/snapshots'
-    }
-
-    maven {
-        name = 'FabricMC'
-        url = 'https://maven.fabricmc.net/'
-    }
-
-    maven {
-        name = 'squiddev repository'
-        url = 'https://maven.squiddev.cc/'
-    }
-
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = "Modrinth"
-                url = "https://api.modrinth.com/maven"
+        maven { url = 'https://maven.nucleoid.xyz' }
+        maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.quiltmc.org/repository/release' }
+        maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+        maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+        maven { url = 'https://repo.grim.ac/snapshots' }
+        maven { url = 'https://maven.squiddev.cc/' }
+        maven { url = 'https://repo.aikar.co/nexus/content/repositories/aikar/' }
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'Modrinth'
+                    url = 'https://api.modrinth.com/maven'
+                }
             }
-        }
-        filter {
-            includeGroup "maven.modrinth"
+            filter { includeGroup 'maven.modrinth' }
         }
     }
 }
 
-configurations {
-    luaShadow
-    Shadow
-    grimNested
-}
+subprojects {
+    tasks.withType(Jar).configureEach {
+        destinationDirectory = rootLibs.get()
+    }
 
-dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
-
-    implementation "eu.pb4:placeholder-api:3.1.0-beta.1+26.2"
-    implementation include("eu.pb4:sgui:2.1.0+26.2")
-
-    implementation "net.kyori:adventure-platform-fabric:7.1.1"
-    implementation include("net.kyori:adventure-text-minimessage:5.2.0")
-    implementation include("net.kyori:adventure-text-serializer-gson:5.2.0")
-
-    implementation include("org.yaml:snakeyaml:2.6")
-
-    compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4")
-    compileOnly "io.github.llamalad7:mixinextras-common:0.5.4"
-    compileOnly "io.github.llamalad7:mixinextras-fabric:0.5.4"
-
-    compileOnly "ac.grim.grimac:GrimAPI:1.6.0.9"
-    compileOnly "ac.grim.grimac:grim-internal:1.6.0.9"
-    compileOnly "ac.grim.grimac:grim-fabric-internal:1.6.0.9"
-
-    implementation files("libs/grimac-fabric.jar")
-    grimNested files("libs/grimac-fabric.jar")
-
-    implementation "net.fabricmc:fabric-language-kotlin:1.13.9+"
-
-    implementation include("eu.pb4:polymer-core:0.17.3+26.2")
-    implementation include("eu.pb4:polymer-blocks:0.17.3+26.2")
-    implementation include("eu.pb4:polymer-resource-pack:0.17.3+26.2")
-    implementation include("eu.pb4:polymer-virtual-entity:0.17.3+26.2")
-    implementation include("eu.pb4:polymer-networking:0.17.3+26.2")
-
-    localRuntime "party.iroiro.luajava:luajit:4.1.0"
-    localRuntime "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
-
-    compileOnly "party.iroiro.luajava:luajit:4.1.0"
-    compileOnly "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
-
-    luaShadow "party.iroiro.luajava:luajit:4.1.0"
-    luaShadow "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
-
-    compileOnly 'net.luckperms:api:5.4'
-
-    compileOnly "maven.modrinth:H4o5bO7g:HnyvUyL6"
-    localRuntime "maven.modrinth:H4o5bO7g:HnyvUyL6"
-
-    localRuntime "maven.modrinth:lhGA9TYQ:1yQC4VvP"
-}
-
-processResources {
-    inputs.property "version", project.version
-
-    filesMatching("fabric.mod.json") {
-        expand "version": project.version
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
     }
 }
 
-loom {
-    accessWidenerPath = file("src/main/resources/brokenstarsmp.accesswidener")
-
-    interfaceInjection {
-        enableDependencyInterfaceInjection = false
-    }
+tasks.named('build') {
+    dependsOn subprojects.collect { "${it.path}:build" }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = "UTF-8"
-    options.release = 25
+tasks.register('buildAll') {
+    dependsOn subprojects.collect { "${it.path}:build" }
 }
 
-tasks.named("jar") {
-    enabled = false
-}
-
-tasks.named("shadowJar") {
-    archiveClassifier.set("")
-
-    configurations = [
-            project.configurations.luaShadow,
-            project.configurations.Shadow
-    ]
-
-    into("META-INF/jars") {
-        from(project.configurations.grimNested) {
-            rename {
-                "grimac.jar"
-            }
-        }
-    }
-}
-
-tasks.named("build") {
-    dependsOn tasks.named("shadowJar"), "sourcesJar", "javadocJar"
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
-}
-
-def bumpVersionLogic = { type ->
-    if (!["major", "minor", "patch"].contains(type)) {
-        throw new GradleException("Unknown version type: $type")
-    }
-
-    def versionFile = file("gradle.properties")
-    def props = new Properties()
-
-    versionFile.withInputStream {
-        props.load(it)
-    }
-
-    def currentVersion = props["mod_version"]
-
-    def matcher = currentVersion =~ /(\d+)\.(\d+)\.(\d+)(-.+)?/
-
-    if (!matcher.matches()) {
-        throw new GradleException("Invalid version format: $currentVersion")
-    }
-
-    def major = matcher[0][1].toInteger()
-    def minor = matcher[0][2].toInteger()
-    def patch = matcher[0][3].toInteger()
-    def suffix = matcher[0][4] ?: ""
-
-    switch (type) {
-        case "major":
-            major += 1
-            minor = 0
-            patch = 0
-            break
-
-        case "minor":
-            minor += 1
-            patch = 0
-            break
-
-        case "patch":
-            patch += 1
-            break
-    }
-
-    def newVersion = "${major}.${minor}.${patch}${suffix}"
-
-    println "Bumping version: $currentVersion -> $newVersion"
-
-    versionFile.text = versionFile.text.replaceFirst(
-            /mod_version=.*/,
-            "mod_version=${newVersion}"
-    )
-
-    project.version = newVersion
-}
-
-tasks.register("bumpVersion") {
+tasks.register('cleanAll') {
+    dependsOn subprojects.collect { "${it.path}:clean" }
     doLast {
-        def type = "patch"
-        def args = gradle.startParameter.taskRequests[0].args
-
-        args.each { arg ->
-            if (arg.startsWith("--")) {
-                type = arg.substring(2)
-            }
-        }
-
-        bumpVersionLogic(type)
+        delete rootProject.layout.buildDirectory
     }
 }
 
-["major", "minor", "patch"].each { t ->
-    tasks.register("bump${t.capitalize()}") {
-        doLast {
-            bumpVersionLogic(t)
-        }
+tasks.register('listJars') {
+    dependsOn tasks.named('buildAll')
+    doLast {
+        fileTree(rootProject.layout.buildDirectory.dir('libs')).matching { include '*.jar' }.files.sort().each { println it }
     }
 }
 
-tasks.named("publish") {
-    dependsOn("sourcesJar", "javadocJar")
-}
-
-tasks.register('sourcesJar', Jar) {
-    archiveClassifier.set("sources")
-    from sourceSets.main.allSource
-}
-
-tasks.register('javadocJar', Jar) {
-    archiveClassifier.set("javadoc")
-    from tasks.named("javadoc")
-}
-
-tasks.withType(Javadoc).configureEach {
-    options.encoding = "UTF-8"
-    options.addStringOption("Xdoclint:none", "-quiet")
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            groupId = project.group
-            artifactId = archives_base_name
-            version = project.version
-
-            artifact(tasks.named("shadowJar")) {
-                builtBy tasks.named("shadowJar")
-            }
-
-            artifact(tasks.named("sourcesJar"))
-            artifact(tasks.named("javadocJar"))
-        }
-    }
-
-    repositories {
-        maven {
-            name = "palorderHosting"
-            url = uri("https://maven.palorderhosting.net/releases/")
-
-            credentials {
-                username = System.getenv("MAVEN_USERNAME")
-                password = System.getenv("MAVEN_PASSWORD")
-            }
-        }
-    }
-}
+defaultTasks 'build'

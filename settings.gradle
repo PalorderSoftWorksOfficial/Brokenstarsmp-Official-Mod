@@ -1,41 +1,19 @@
 pluginManagement {
     repositories {
-        gradlePluginPortal()
-        maven {
-            name = 'PalorderHosting'
-            url = 'https://maven.palorderhosting.net/releases'
-        }
-        maven {
-            name = 'FabricMC'
-            url = 'https://maven.fabricmc.net/'
-        }
-        maven {
-            name = 'QuiltMC'
-            url = 'https://maven.quiltmc.org/repository/release'
-        }
-        maven {
-            name = 'Forge'
-            url = 'https://maven.minecraftforge.net/'
-        }
-        maven {
-            name = 'NeoForged'
-            url = 'https://maven.neoforged.net/releases'
-        }
-        maven {
-            name = 'PaperMC'
-            url = 'https://repo.papermc.io/repository/maven-public/'
-        }
-        maven {
-            name = 'SpigotMC'
-            url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
-        }
+        maven { name = 'FabricMC'; url = 'https://maven.fabricmc.net/' }
+        maven { name = 'QuiltMC'; url = 'https://maven.quiltmc.org/repository/release' }
+        maven { name = 'PaperMC'; url = 'https://repo.papermc.io/repository/maven-public/' }
         mavenCentral()
+        gradlePluginPortal()
     }
 }
-include(
-        //"fabric-template",
-        //"fabric-26.1.2",
-        //"paper",
-        //"spigot",
-)
-includeBuild("quilt-1.21.11")
+
+rootProject.name = 'Brokenstarsmp-Official-Mod'
+
+include 'common'
+include 'fabric'
+include 'fabric-26.1.2'
+include 'paper'
+include 'spigot'
+include 'velocity'
+include 'quilt'
