@@ -20,10 +20,10 @@ public final class TranslationProbeSignHelper {
         BlockPos base = player.blockPosition();
         ServerLevel world = (ServerLevel) player.level();
         int[][] offsets = {
-                {0, 1, 0}, {0, 2, 0}, {0, 3, 0}, {0, 4, 0}, {0, 5, 0},
-                {1, 1, 0}, {-1, 1, 0}, {0, 1, 1}, {0, 1, -1},
-                {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1},
-                {2, 1, 0}, {-2, 1, 0}, {0, 1, 2}, {0, 1, -2}
+                {0, 3, 0}, {0, 4, 0}, {0, 2, 0}, {0, 5, 0}, {0, 1, 0},
+                {1, 3, 0}, {-1, 3, 0}, {0, 3, 1}, {0, 3, -1},
+                {1, 2, 0}, {-1, 2, 0}, {0, 2, 1}, {0, 2, -1},
+                {1, 4, 0}, {-1, 4, 0}, {0, 4, 1}, {0, 4, -1}
         };
         for (int[] offset : offsets) {
             BlockPos pos = base.offset(offset[0], offset[1], offset[2]);
@@ -51,7 +51,6 @@ public final class TranslationProbeSignHelper {
         if (!(player.level() instanceof ServerLevel world)) {
             return;
         }
-
         try {
             BlockEntity blockEntity = world.getBlockEntity(signPos);
             for (int i = 0; i < 3; i++) {
