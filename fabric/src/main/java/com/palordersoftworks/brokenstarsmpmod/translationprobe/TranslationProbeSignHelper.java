@@ -48,12 +48,17 @@ public final class TranslationProbeSignHelper {
     }
 
     public static void clearVirtualSign(ServerPlayer player, BlockPos signPos) {
-        ServerLevel world = (ServerLevel) player.level();
+        if (!(player.level() instanceof ServerLevel world)) {
+            return;
+        }
+
         try {
-            player.connection.send(new ClientboundBlockUpdatePacket(signPos, world.getBlockState(signPos)));
             BlockEntity blockEntity = world.getBlockEntity(signPos);
-            if (blockEntity != null) {
-                player.connection.send(ClientboundBlockEntityDataPacket.create(blockEntity));
+            for (int i = 0; i < 3; i++) {
+                player.connection.send(new ClientboundBlockUpdatePacket(signPos, world.getBlockState(signPos)));
+                if (blockEntity != null) {
+                    player.connection.send(ClientboundBlockEntityDataPacket.create(blockEntity));
+                }
             }
         } catch (Exception e) {
             LOGGER.warn("[BrokenStarSMP/CheckHacks] sign cleanup packet failed for {} at {}: {}",
