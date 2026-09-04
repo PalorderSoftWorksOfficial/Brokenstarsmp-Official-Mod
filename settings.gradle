@@ -1,7 +1,6 @@
 pluginManagement {
     repositories {
         maven { name = 'FabricMC'; url = 'https://maven.fabricmc.net/' }
-        maven { name = 'QuiltMC'; url = 'https://maven.quiltmc.org/repository/release' }
         maven { name = 'PaperMC'; url = 'https://repo.papermc.io/repository/maven-public/' }
         mavenCentral()
         gradlePluginPortal()
@@ -12,8 +11,6 @@ rootProject.name = 'Brokenstarsmp-Official-Mod'
 
 include 'common'
 include 'fabric'
-include 'fabric-26.1.2'
 include 'paper'
 include 'spigot'
 include 'velocity'
-include 'quilt'
