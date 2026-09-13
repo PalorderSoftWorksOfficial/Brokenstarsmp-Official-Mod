@@ -9,6 +9,8 @@ import com.palordersoftworks.brokenstarsmpmod.config.Enums.RuleType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -210,7 +212,10 @@ public final class ConfigManager {
     @SuppressWarnings("unchecked")
     public static void registerCommands() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            var root = Commands.literal("brokenstarsmp");
+            var root = Commands.literal("brokenstarsmp")
+                    // Admin-only: configuring server rules requires op level 2 (gamemasters).
+                    .requires(source -> source.permissions()
+                            .hasPermission(new Permission.HasCommandLevel(PermissionLevel.GAMEMASTERS)));
 
             root.executes(context -> {
                 for (ConfigEntry<?> entry : CONFIGS.values()) {

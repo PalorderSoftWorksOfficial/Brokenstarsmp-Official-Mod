@@ -43,8 +43,8 @@ dependencies {
     implementation files("${rootProject.projectDir}/libs/grimac-fabric.jar")
     grimNested files("${rootProject.projectDir}/libs/grimac-fabric.jar")
     compileOnly 'net.luckperms:api:5.4'
-    compileOnly "maven.modrinth:H4o5bO7g:HnyvUyL6"
-    localRuntime "maven.modrinth:H4o5bO7g:HnyvUyL6"
+    compileOnly "maven.modrinth:H4o5bO7g:rKRO08uQ"
+    localRuntime "maven.modrinth:H4o5bO7g:rKRO08uQ"
     localRuntime "maven.modrinth:lhGA9TYQ:1yQC4VvP"
     compileOnly "party.iroiro.luajava:luajit:4.1.0"
     compileOnly "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"

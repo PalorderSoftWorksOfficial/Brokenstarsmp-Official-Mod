@@ -5,8 +5,14 @@ import com.palordersoftworks.brokenstarsmpmod.commands.ImmortalCommand;
 import com.palordersoftworks.brokenstarsmpmod.commands.LinkFishingRod;
 import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.config.TeamRules;
 import com.palordersoftworks.brokenstarsmpmod.config.UnstableSMPRules;
 import com.palordersoftworks.brokenstarsmpmod.fluid.CobbleOreQueue;
+import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopCommands;
+import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopConfig;
+import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopService;
+import com.palordersoftworks.brokenstarsmpmod.teams.TeamsCommand;
+import com.palordersoftworks.brokenstarsmpmod.teams.TeamManager;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeCommands;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeController;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtras;
@@ -62,6 +68,8 @@ public class DropAtFeet implements ModInitializer {
 
         ConfigManager.registerAnnotatedConfigs(ServerRules.class);
         ConfigManager.registerAnnotatedConfigs(UnstableSMPRules.class);
+        ConfigManager.registerAnnotatedConfigs(TeamRules.class);
+        ConfigManager.registerAnnotatedConfigs(RankShopConfig.class);
 
         ConfigManager.registerCommands();
 
@@ -77,7 +85,21 @@ public class DropAtFeet implements ModInitializer {
             AptCommand.register(dispatcher, registryAccess, environment);
 
             ImmortalCommand.register(dispatcher, registryAccess, environment);
+
+            TeamsCommand.register(dispatcher);
+
+            RankShopCommands.register(dispatcher);
         });
+
+        ServerLifecycleEvents.SERVER_STARTED.register(RankShopService::init);
+
+        ServerLifecycleEvents.SERVER_STOPPING.register(server ->
+                RankShopService.shutdown()
+        );
+
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+                RankShopService.onPlayerJoin(handler.player)
+        );
 
 
         ServerLifecycleEvents.SERVER_STARTED.register(
@@ -100,12 +122,27 @@ public class DropAtFeet implements ModInitializer {
                 )
         );
 
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+                TeamManager.onPlayerJoin(handler.player)
+        );
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
                 TranslationProbeController.clearPlayer(
                         handler.player.getUUID(),
                         server
                 )
+        );
+
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
+                TeamManager.onPlayerLeave(handler.player)
+        );
+
+        ServerLifecycleEvents.SERVER_STARTED.register(server ->
+                TeamManager.init(server)
+        );
+
+        ServerLifecycleEvents.SERVER_STOPPING.register(server ->
+                TeamManager.shutdown()
         );
 
 
