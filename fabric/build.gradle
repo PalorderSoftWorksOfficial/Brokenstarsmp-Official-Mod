@@ -46,6 +46,8 @@ dependencies {
     compileOnly "maven.modrinth:H4o5bO7g:rKRO08uQ"
     localRuntime "maven.modrinth:H4o5bO7g:rKRO08uQ"
     localRuntime "maven.modrinth:lhGA9TYQ:1yQC4VvP"
+    // Dev-runtime only: GrimAC (nested in the mod jar) hard-depends on packetevents.
+    localRuntime "com.github.retrooper:packetevents-fabric:2.13.0"
     compileOnly "party.iroiro.luajava:luajit:4.1.0"
     compileOnly "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
     luaShadow "party.iroiro.luajava:luajit:4.1.0"

@@ -110,6 +110,21 @@ public final class EconomyExtras {
         return banknotes;
     }
 
+    /** GUI entry point; identical rules as the /redeem command (uses main-hand item). */
+    public static void redeemForGui(ServerPlayer player) {
+        redeem(player);
+    }
+
+    /** GUI entry point; identical rules and messages as the /withdraw command. */
+    public static void withdrawForGui(ServerPlayer player, long amount) {
+        withdraw(player, amount);
+    }
+
+    /** GUI entry point; identical rules as the /givesellwand command. */
+    public static void giveSellWandForGui(ServerPlayer target, ServerPlayer actor) {
+        giveSellWand(target, actor);
+    }
+
     private static int withdraw(ServerPlayer player, long amount) {
         if (!EconomyExtrasConfig.get().banknotesEnabled) {
             player.sendSystemMessage(Component.literal("Banknotes are disabled.").withStyle(ChatFormatting.RED));

@@ -57,12 +57,22 @@ public final class RankShopStore {
         if (amount < 0) {
             return false;
         }
+        Long previous = balances.get(player);
         if (amount == 0) {
             balances.remove(player);
         } else {
             balances.put(player, amount);
         }
-        return save();
+        if (!save()) {
+            LOGGER.error("[BrokenStars] CRITICAL: token balance set for {} was not persisted; rolling back in memory", player);
+            if (previous == null) {
+                balances.remove(player);
+            } else {
+                balances.put(player, previous);
+            }
+            return false;
+        }
+        return true;
     }
 
     /** @return true if the player held at least {@code amount} tokens, which are then removed. */

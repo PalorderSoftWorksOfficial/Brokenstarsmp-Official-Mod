@@ -31,7 +31,6 @@
     "Projectile_TeamFireMixin",
     "ServerPlayerEntity_Mixin",
     "ServerPlayer_TeamFireMixin",
-    "ServerPlayer_DeathMessageMixin",
     "ServerPlayNetworkHandler_TranslationProbeMixin",
     "ServerCommonPacketListenerImpl_LunarClientMixin",
     "ServerWorld_EntityProcessingLimit_Mixin"

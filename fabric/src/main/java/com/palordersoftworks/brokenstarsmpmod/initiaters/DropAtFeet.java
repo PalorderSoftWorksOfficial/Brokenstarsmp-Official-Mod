@@ -16,6 +16,7 @@ import com.palordersoftworks.brokenstarsmpmod.teams.TeamManager;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeCommands;
 import com.palordersoftworks.brokenstarsmpmod.translationprobe.TranslationProbeController;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtras;
+import com.palordersoftworks.brokenstarsmpmod.gui.HubGui;
 import com.palordersoftworks.brokenstarsmpmod.unstablesmp.UnstableSMPFeatures;
 import com.palordersoftworks.luaj.accesswidener.LuaCommands;
 import com.palordersoftworks.luaj.accesswidener.LuaScriptManager;
@@ -84,11 +85,9 @@ public class DropAtFeet implements ModInitializer {
 
             AptCommand.register(dispatcher, registryAccess, environment);
 
-            ImmortalCommand.register(dispatcher, registryAccess, environment);
-
-            TeamsCommand.register(dispatcher);
-
+            ImmortalCommand.register(dispatcher, registryAccess, environment);            TeamsCommand.register(dispatcher);
             RankShopCommands.register(dispatcher);
+            HubGui.register(dispatcher);
         });
 
         ServerLifecycleEvents.SERVER_STARTED.register(RankShopService::init);
