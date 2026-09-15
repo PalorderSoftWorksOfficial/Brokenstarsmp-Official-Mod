@@ -204,6 +204,21 @@ public final class RankShopUi {
                 .setLore(loreLines(RankShopConfig.RANK_SHOP_EXCHANGE_INFO_LORE, infoPlaceholders))
                 .build());
 
+        // Sell Tokens button (tokens -> money at the discounted sell rate)
+        if (RankShopConfig.RANK_TOKEN_SELL_ENABLED
+                && validSlot(RankShopConfig.RANK_SHOP_SELL_SLOT, 27)) {
+            String sellRate = RankShopEconomy.formatMoney(RankShopService.sellPayout(1));
+            gui.setSlot(RankShopConfig.RANK_SHOP_SELL_SLOT, new GuiElementBuilder(
+                            item(RankShopConfig.RANK_SHOP_SELL_MATERIAL, Items.EMERALD))
+                    .setName(mm(RankShopConfig.RANK_SHOP_SELL_BUTTON_NAME, Map.of("rate", sellRate)))
+                    .setLore(loreLines(RankShopConfig.RANK_SHOP_SELL_BUTTON_LORE, Map.of("rate", sellRate)))
+                    .setCallback((index, clickType, input, g) -> {
+                        RankShopService.playSound(player, RankShopConfig.RANK_SHOP_SOUND_CLICK);
+                        openSell(player);
+                    })
+                    .build());
+        }
+
         // Sorted numeric exchange options -> deterministic slot layout.
         Map<Long, Long> options = new TreeMap<>();
         for (Map.Entry<String, Object> entry : RankShopConfig.RANK_SHOP_CONVERT_OPTIONS.entrySet()) {
@@ -247,6 +262,106 @@ public final class RankShopUi {
         gui.setSlot(RankShopConfig.RANK_SHOP_EXCHANGE_BACK_SLOT, new GuiElementBuilder(Items.BARRIER)
                 .setName(mm("<red><bold>Back</bold></red>", Map.of()))
                 .setCallback((index, clickType, input, g) -> openShop(player))
+                .build());
+
+        gui.open();
+    }
+
+    // ---- token sell (tokens -> money) ----------------------------------------------
+
+    /** Same configured token counts as the buy exchange, paid out at the sell rate. */
+    public static void openSell(ServerPlayer player) {
+        SimpleGui gui = new SimpleGui(MenuType.GENERIC_9x3, player, false);
+        gui.setTitle(mm(RankShopConfig.RANK_SHOP_SELL_TITLE, Map.of()));
+
+        for (int i = 0; i < 27; i++) {
+            gui.setSlot(i, new GuiElementBuilder(
+                    item(RankShopConfig.RANK_SHOP_FILLER, Items.STAINED_GLASS_PANE.gray())).build());
+        }
+
+        long money = RankShopEconomy.getMoney(player.level().getServer(), player.getUUID());
+        long tokens = RankShopService.store().getBalance(player.getUUID());
+        double perToken = RankShopConfig.RANK_TOKEN_MONEY_PER_TOKEN;
+        String buyRate = perToken > 0 ? RankShopEconomy.formatMoney((long) Math.floor(perToken)) : "?";
+        String sellRate = RankShopEconomy.formatMoney(RankShopService.sellPayout(1));
+
+        Map<String, String> infoPlaceholders = Map.of(
+                "money", RankShopEconomy.formatMoney(money),
+                "tokens", String.valueOf(tokens),
+                "buy_rate", buyRate,
+                "rate", sellRate);
+
+        gui.setSlot(13, new GuiElementBuilder(item(RankShopConfig.RANK_SHOP_SELL_MATERIAL, Items.EMERALD))
+                .setName(mm(RankShopConfig.RANK_SHOP_SELL_INFO_NAME, infoPlaceholders))
+                .setLore(loreLines(RankShopConfig.RANK_SHOP_SELL_INFO_LORE, infoPlaceholders))
+                .build());
+
+        // Same token counts as buying, deterministic slots.
+        Map<Long, Long> options = new TreeMap<>();
+        for (Map.Entry<String, Object> entry : RankShopConfig.RANK_SHOP_CONVERT_OPTIONS.entrySet()) {
+            try {
+                long tokenCount = Long.parseLong(entry.getKey().trim());
+                if (tokenCount > 0) {
+                    options.put(tokenCount, RankShopService.sellPayout(tokenCount));
+                }
+            } catch (NumberFormatException ignored) {
+                // Config error: skip silently; the yml is admin-owned.
+            }
+        }
+
+        int slotIndex = 0;
+        for (Map.Entry<Long, Long> entry : options.entrySet()) {
+            if (slotIndex >= EXCHANGE_OPTION_SLOTS.length) {
+                break;
+            }
+            long tokenCount = entry.getKey();
+            long payout = entry.getValue();
+            if (payout <= 0) {
+                continue;
+            }
+            Map<String, String> placeholders = Map.of(
+                    "tokens", String.valueOf(tokenCount),
+                    "money", RankShopEconomy.formatMoney(payout),
+                    "rate", sellRate);
+
+            gui.setSlot(EXCHANGE_OPTION_SLOTS[slotIndex++], new GuiElementBuilder(
+                            item(RankShopConfig.RANK_SHOP_SELL_MATERIAL, Items.EMERALD))
+                    .setName(mm(RankShopConfig.RANK_SHOP_SELL_OPTION_NAME, placeholders))
+                    .setLore(loreLines(RankShopConfig.RANK_SHOP_SELL_OPTION_LORE, placeholders))
+                    .setCallback((index, clickType, input, g) -> {
+                        RankShopService.playSound(player, RankShopConfig.RANK_SHOP_SOUND_CLICK);
+                        if (RankShopService.convertTokensToMoney(player, tokenCount)) {
+                            openSell(player);
+                        } else {
+                            openSell(player);
+                        }
+                    })
+                    .build());
+        }
+
+        // Sell All
+        if (validSlot(RankShopConfig.RANK_SHOP_SELL_ALL_SLOT, 27) && tokens > 0) {
+            long payout = RankShopService.sellPayout(tokens);
+            Map<String, String> placeholders = Map.of(
+                    "tokens", String.valueOf(tokens),
+                    "money", RankShopEconomy.formatMoney(payout));
+            gui.setSlot(RankShopConfig.RANK_SHOP_SELL_ALL_SLOT, new GuiElementBuilder(Items.GOLD_INGOT)
+                    .setName(mm(RankShopConfig.RANK_SHOP_SELL_ALL_NAME, placeholders))
+                    .setLore(loreLines(RankShopConfig.RANK_SHOP_SELL_ALL_LORE, placeholders))
+                    .setCallback((index, clickType, input, g) -> {
+                        RankShopService.playSound(player, RankShopConfig.RANK_SHOP_SOUND_CLICK);
+                        if (RankShopService.convertTokensToMoney(player, tokens)) {
+                            openShop(player);
+                        } else {
+                            openSell(player);
+                        }
+                    })
+                    .build());
+        }
+
+        gui.setSlot(RankShopConfig.RANK_SHOP_EXCHANGE_BACK_SLOT, new GuiElementBuilder(Items.BARRIER)
+                .setName(mm("<red><bold>Back</bold></red>", Map.of()))
+                .setCallback((index, clickType, input, g) -> openExchange(player))
                 .build());
 
         gui.open();

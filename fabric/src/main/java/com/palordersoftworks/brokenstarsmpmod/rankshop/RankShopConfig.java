@@ -22,9 +22,6 @@ public final class RankShopConfig {
 
     // ---- currency -----------------------------------------------------------
 
-    @Rule(name = "rankTokenName", desc = "Display name of the Rank Token currency (MiniMessage)")
-    public static String RANK_TOKEN_NAME = "<gold><bold>Rank Token</bold></gold>";
-
     @Rule(name = "rankTokenMoneyPerToken", desc = "Server money required for 1 Rank Token (EconomyCraft balance is long-backed)")
     public static double RANK_TOKEN_MONEY_PER_TOKEN = 100_000_000.0;
 
@@ -188,6 +185,50 @@ public final class RankShopConfig {
     @Rule(name = "rankShopExchangeBackSlot", desc = "Back button slot in the exchange GUI")
     public static int RANK_SHOP_EXCHANGE_BACK_SLOT = 22;
 
+    // ---- sell exchange (tokens -> money) ---------------------------------------
+
+    @Rule(name = "rankTokenSellEnabled", desc = "Allow Rank Token -> money exchange in the shop GUI")
+    public static boolean RANK_TOKEN_SELL_ENABLED = true;
+
+    @Rule(name = "rankTokenSellMultiplier", desc = "Sell payout as a fraction of the buy rate (0.25 = 25% of the buy price, i.e. 75% below)")
+    public static double RANK_TOKEN_SELL_MULTIPLIER = 0.25;
+
+    @Rule(name = "rankShopSellSlot", desc = "Slot of the Sell Tokens button in the exchange GUI")
+    public static int RANK_SHOP_SELL_SLOT = 11;
+
+    @Rule(name = "rankShopSellButtonName", desc = "Sell button name in the exchange GUI (MiniMessage, <rate> placeholder)")
+    public static String RANK_SHOP_SELL_BUTTON_NAME = "<green><bold>Sell Rank Tokens</bold></green>";
+
+    @Rule(name = "rankShopSellButtonLore", desc = "Sell button lore in the exchange GUI (MiniMessage, <rate> placeholder). | separates lines")
+    public static String RANK_SHOP_SELL_BUTTON_LORE = "<gray>Sell Rank Tokens back|<gray>for <yellow><rate></yellow> <gray>each.||<green>Click to sell";
+
+    @Rule(name = "rankShopSellTitle", desc = "Sell GUI title (MiniMessage)")
+    public static String RANK_SHOP_SELL_TITLE = "<dark_gray><bold>Sell Rank Tokens</bold></dark_gray>";
+
+    @Rule(name = "rankShopSellMaterial", desc = "Material of sell buttons")
+    public static String RANK_SHOP_SELL_MATERIAL = "EMERALD";
+
+    @Rule(name = "rankShopSellInfoName", desc = "Sell info item name (MiniMessage)")
+    public static String RANK_SHOP_SELL_INFO_NAME = "<green><bold>Sell Rank Tokens</bold></green>";
+
+    @Rule(name = "rankShopSellInfoLore", desc = "Sell info item lore (MiniMessage). | separates lines")
+    public static String RANK_SHOP_SELL_INFO_LORE = "<gray>Your money: <yellow><money></yellow>||<gray>Your Rank Tokens: <yellow><tokens></yellow>||<gray>Buy rate: <yellow><buy_rate></yellow> <gray>→ 1 token|<gray>Sell rate: <yellow><rate></yellow> <gray>← 1 token";
+
+    @Rule(name = "rankShopSellOptionName", desc = "Sell option button name (MiniMessage)")
+    public static String RANK_SHOP_SELL_OPTION_NAME = "<green><tokens> Rank Token(s)</green>";
+
+    @Rule(name = "rankShopSellOptionLore", desc = "Sell option button lore (MiniMessage). | separates lines")
+    public static String RANK_SHOP_SELL_OPTION_LORE = "<gray>You receive <yellow><money></yellow>||<green>Click to sell";
+
+    @Rule(name = "rankShopSellAllSlot", desc = "Sell All button slot in the sell GUI")
+    public static int RANK_SHOP_SELL_ALL_SLOT = 20;
+
+    @Rule(name = "rankShopSellAllName", desc = "Sell All button name (MiniMessage)")
+    public static String RANK_SHOP_SELL_ALL_NAME = "<green><bold>Sell All</bold></green>";
+
+    @Rule(name = "rankShopSellAllLore", desc = "Sell All button lore (MiniMessage). | separates lines")
+    public static String RANK_SHOP_SELL_ALL_LORE = "<gray>Sell your whole balance of <yellow><tokens></yellow> token(s)||<gray>You receive <yellow><money></yellow>||<green>Click to sell";
+
     // ---- messages -------------------------------------------------------------
 
     @Rule(name = "rankShopMsgBalance", desc = "Chat message for /ranktokens balance (MiniMessage)")
@@ -211,6 +252,9 @@ public final class RankShopConfig {
     @Rule(name = "rankShopMsgConvertFailed", desc = "Chat message when money is insufficient (MiniMessage)")
     public static String RANK_SHOP_MSG_CONVERT_FAILED = "<red>Not enough money! <gray>Required: <yellow><money></yellow><gray>, you have <yellow><balance></yellow><gray>.";
 
+    @Rule(name = "rankShopMsgSellSuccess", desc = "Chat message after selling tokens (MiniMessage)")
+    public static String RANK_SHOP_MSG_SELL_SUCCESS = "<green>Sold <yellow><tokens> Rank Token(s)</yellow> <green>for <yellow><money></yellow><green>.";
+
     // ---- sounds -----------------------------------------------------------------
 
     @Rule(name = "rankShopSoundPurchase", desc = "Sound on successful purchase (registry name, empty = silent)")
@@ -224,4 +268,7 @@ public final class RankShopConfig {
 
     @Rule(name = "rankShopSoundConvert", desc = "Sound on a successful exchange (registry name)")
     public static String RANK_SHOP_SOUND_CONVERT = "ENTITY_PLAYER_LEVELUP";
+
+    @Rule(name = "rankShopSoundSell", desc = "Sound on a successful token sale (registry name)")
+    public static String RANK_SHOP_SOUND_SELL = "ENTITY_EXPERIENCE_ORB_PICKUP";
 }

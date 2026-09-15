@@ -340,6 +340,76 @@ public final class RankShopService {
         return true;
     }
 
+    // ---- tokens -> money --------------------------------------------------------
+
+    /**
+     * Sell-rate payout for {@code tokens} tokens: a configurable fraction of the
+     * buy rate (default 25%, i.e. selling pays 75% below what a token costs),
+     * floored per-token so long math never rounds up in the player's favour.
+     */
+    public static long sellPayout(long tokens) {
+        if (tokens <= 0) {
+            return 0L;
+        }
+        double multiplier = RankShopConfig.RANK_TOKEN_SELL_MULTIPLIER;
+        if (multiplier <= 0) {
+            return 0L;
+        }
+        double perToken = RankShopConfig.RANK_TOKEN_MONEY_PER_TOKEN;
+        long payoutPerToken = (long) Math.floor(perToken * multiplier);
+        if (payoutPerToken <= 0) {
+            return 0L;
+        }
+        BigInteger payout = BigInteger.valueOf(payoutPerToken).multiply(BigInteger.valueOf(tokens));
+        return payout.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0 ? Long.MAX_VALUE : payout.longValue();
+    }
+
+    /** @return true when the sale fully succeeded. */
+    public static boolean convertTokensToMoney(ServerPlayer player, long tokens) {
+        if (tokens <= 0) {
+            return false;
+        }
+        UUID playerUuid = player.getUUID();
+        long balance = store().getBalance(playerUuid);
+        if (balance < tokens) {
+            player.sendSystemMessage(Component.literal("You do not have that many Rank Tokens.")
+                    .withStyle(ChatFormatting.RED));
+            playSound(player, RankShopConfig.RANK_SHOP_SOUND_DENY);
+            return false;
+        }
+
+        long payout = sellPayout(tokens);
+        if (payout <= 0) {
+            player.sendSystemMessage(Component.literal("Token selling is misconfigured.").withStyle(ChatFormatting.RED));
+            return false;
+        }
+
+        // Tokens leave first (the store persists synchronously or refuses),
+        // money is credited second; a failed credit refunds the tokens.
+        if (!store().withdraw(playerUuid, tokens)) {
+            playSound(player, RankShopConfig.RANK_SHOP_SOUND_DENY);
+            return false;
+        }
+
+        try {
+            RankShopEconomy.depositMoney(boundServer, playerUuid, payout);
+        } catch (Exception e) {
+            com.mojang.logging.LogUtils.getLogger()
+                    .error("[BrokenStars] Token sale payout failed for {}; refunding tokens", playerUuid, e);
+            store().deposit(playerUuid, tokens);
+            player.sendSystemMessage(Component.literal("Sale failed - your Rank Tokens were refunded.")
+                    .withStyle(ChatFormatting.RED));
+            playSound(player, RankShopConfig.RANK_SHOP_SOUND_DENY);
+            return false;
+        }
+
+        sendMini(player, RankShopConfig.RANK_SHOP_MSG_SELL_SUCCESS, Map.of(
+                "money", RankShopEconomy.formatMoney(payout),
+                "tokens", String.valueOf(tokens)));
+        playSound(player, RankShopConfig.RANK_SHOP_SOUND_SELL);
+        return true;
+    }
+
     // ---- admin -----------------------------------------------------------------
 
     public static void giveTokens(UUID target, long amount) {

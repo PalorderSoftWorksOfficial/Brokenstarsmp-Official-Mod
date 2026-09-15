@@ -364,10 +364,4 @@ public class ServerRules {
             name = "noXpSplit"
     )
     public static boolean NO_XP_SPLIT = false;
-
-    @Rule(
-            desc = "§7§oHides the killer's name in death messages when the killer is invisible.",
-            name = "hideInvisibleKillerInDeathMessages"
-    )
-    public static boolean HIDE_INVISIBLE_KILLER_IN_DEATH_MESSAGES = true;
 }
