@@ -43,11 +43,13 @@ dependencies {
     implementation files("${rootProject.projectDir}/libs/grimac-fabric.jar")
     grimNested files("${rootProject.projectDir}/libs/grimac-fabric.jar")
     compileOnly 'net.luckperms:api:5.4'
-    compileOnly "maven.modrinth:H4o5bO7g:rKRO08uQ"
-    localRuntime "maven.modrinth:H4o5bO7g:rKRO08uQ"
-    localRuntime "maven.modrinth:lhGA9TYQ:1yQC4VvP"
+    compileOnly "maven.modrinth:H4o5bO7g:ihsG4dCL"
+    localRuntime "maven.modrinth:H4o5bO7g:ihsG4dCL"
+    // EconomyCraft 1.10.0's pom floor (architectury 21.0.7) is below its own requirement (21.1.9).
+    localRuntime "maven.modrinth:lhGA9TYQ:Jmfixwxe"
     // Dev-runtime only: GrimAC (nested in the mod jar) hard-depends on packetevents.
-    localRuntime "com.github.retrooper:packetevents-fabric:2.13.0"
+    // Vendored (git-ignored) because the codemc coordinate is the intermediary build, wrong for 26.2.
+    localRuntime files("${rootProject.projectDir}/libs/packetevents-fabric-2.13.0.jar")
     compileOnly "party.iroiro.luajava:luajit:4.1.0"
     compileOnly "party.iroiro.luajava:luajit-platform:4.1.0:natives-desktop"
     luaShadow "party.iroiro.luajava:luajit:4.1.0"

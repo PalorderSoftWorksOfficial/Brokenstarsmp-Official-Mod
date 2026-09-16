@@ -16,7 +16,6 @@
     "FishingRodItem_Mixin",
     "FluidBlockMixin",
     "HopperBlockEntity_Mixin",
-    "HubUi_ShopRename_Mixin",
     "ItemDispenserBehaviorMixin",
     "ItemEntity_MergeMixin",
     "ItemEntity_Mixin",

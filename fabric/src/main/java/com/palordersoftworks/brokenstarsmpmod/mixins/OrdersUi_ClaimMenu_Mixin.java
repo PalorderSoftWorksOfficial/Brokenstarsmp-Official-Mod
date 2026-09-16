@@ -25,11 +25,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Adds Drop All to EconomyCraft 1.9.0's claims menu and routes every collection
+ * Adds Drop All to EconomyCraft 1.10.0's deliveries menu and routes every collection
  * through the authoritative delivery ledger ({@code DeliveryManager}), never through
  * the displayed container contents.
  *
- * EconomyCraft's own click handling copies the *displayed* stack, inserts the copy
+ * EconomyCraft's click handling copies the *displayed* stack, inserts the copy
  * into the player inventory and only then removes the matching ledger entry. Because
  * {@code updatePage()} snapshots ledger references into the container, a refresh race
  * (or a stale page after another claim) lets a displayed stack be delivered while the

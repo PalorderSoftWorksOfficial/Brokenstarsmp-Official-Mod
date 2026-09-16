@@ -7,7 +7,7 @@ import net.minecraft.server.MinecraftServer;
 import java.util.UUID;
 
 /**
- * Small abstraction over EconomyCraft 1.9.0 for the Rank Shop.
+ * Small abstraction over EconomyCraft for the Rank Shop.
  *
  * Backed by the real API ({@code EconomyCraft.getManager}, {@code getBalance},
  * {@code removeMoney}/{@code addMoney}, {@code EconomyCraft.formatMoney}) so shop
