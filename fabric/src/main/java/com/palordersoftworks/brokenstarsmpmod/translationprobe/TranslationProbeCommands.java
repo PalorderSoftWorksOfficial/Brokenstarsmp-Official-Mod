@@ -3,6 +3,8 @@ package com.palordersoftworks.brokenstarsmpmod.translationprobe;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
@@ -20,8 +22,7 @@ public final class TranslationProbeCommands {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(
                     literal("bsmpprobe")
-                            .requires(src -> src.permissions().hasPermission(
-                                    new Permission.HasCommandLevel(PermissionLevel.GAMEMASTERS)))
+                            .requires(src -> PermissionCompat.has(src, PermissionNodes.CHECKHACKS_ADMIN))
                             .then(literal("reload")
                                     .executes(ctx -> {
                                         var server = ctx.getSource().getServer();

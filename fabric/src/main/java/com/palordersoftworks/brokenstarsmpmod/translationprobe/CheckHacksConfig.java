@@ -109,12 +109,24 @@ public final class CheckHacksConfig {
         put(c, "climbladdersfast", "Climb Ladders Fast", "key.climbladdersfast.toggle", HackProbeMode.KEYBIND);
         put(c, "stepup", "StepUp", "key.stepup.toggle", HackProbeMode.KEYBIND);
         put(c, "playerhighlighter", "PlayerHighlighter", "key.playerhighlighter.toggle", HackProbeMode.KEYBIND);
+        put(c, "trouser-streak", "Trouser Streak", "addon.trouser-streak.name", HackProbeMode.TRANSLATE);
+        put(c, "ui-utils", "Ui Utils", "key.ui-utils.restore_screen", HackProbeMode.TRANSLATE);
+        put(c, "seedcrackerx", "SeedCrackerX", "cracker.already", HackProbeMode.TRANSLATE);
+        put(c, "simple-world-downloader", "Simple World Downloader", "swd.screen.config.title", HackProbeMode.TRANSLATE);
+        put(c, "trouser-streak-newchunks", "Trouser Streak (NewerNewChunks)", "module.trouser-streak.NewerNewChunks.description", HackProbeMode.TRANSLATE);
+        put(c, "trouser-streak-anhero", "Trouser Streak (AnHero)", "module.trouser-streak.AnHero.description", HackProbeMode.TRANSLATE);
+        put(c, "glazed", "Glazed", "addon.glazed.name", HackProbeMode.TRANSLATE);
+        put(c, "litematica", "Litematica", "litematica.hotkey.name.openmainmenuscreen", HackProbeMode.TRANSLATE);
+        put(c, "itemscroller", "Item Scroller", "itemscroller.hotkey.name.openconfigscreen", HackProbeMode.TRANSLATE);
+        put(c, "xaeros-minimap", "Xaero's Minimap", "gui.xaero_minimap", HackProbeMode.TRANSLATE);
+        put(c, "baritone", "Baritone", "baritone.setting.allowBreak", HackProbeMode.TRANSLATE);
 
         c.defaultCheckHacks = new ArrayList<>(c.hacks.keySet());
         c.autoCheckOnJoin = new AutoCheckOnJoin();
         c.autoCheckOnJoin.hacks = new ArrayList<>(List.of(
                 "meteor-client", "liquidbounce", "freecam", "wurst",
-                "bleachhack", "aristois", "world-downloader", "autoclicker-fabric", "antiafk"
+                "bleachhack", "aristois", "world-downloader", "autoclicker-fabric", "antiafk",
+                "litematica", "itemscroller", "xaeros-minimap", "baritone"
         ));
         c.detectFlag = new DetectFlag();
         c.detectFlag.anticheats.put("grimac", true);

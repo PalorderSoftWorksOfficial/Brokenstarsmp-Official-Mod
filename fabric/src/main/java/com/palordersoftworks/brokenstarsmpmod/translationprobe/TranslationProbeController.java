@@ -407,7 +407,7 @@ public final class TranslationProbeController {
                 run.results.put(hack.id, HackProbeResultState.SKIPPED);
             }
             run.batchIndex++;
-            run.resumeAtTick = server.getTickCount() + Math.max(0, fileConfig.betweenSignTicks);
+            scheduleNextBatchOrFinish(server, player.getUUID(), run);
             return;
         }
 
