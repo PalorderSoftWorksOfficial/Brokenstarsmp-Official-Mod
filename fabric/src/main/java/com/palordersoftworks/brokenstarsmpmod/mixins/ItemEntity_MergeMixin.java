@@ -1,6 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicAccess;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,14 +18,14 @@ public abstract class ItemEntity_MergeMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void mergeNearby(CallbackInfo ci) {
-        if (!ServerRules.INSTANT_ITEM_MERGE) return;
+        if (!MechanicAccess.bool("item_merging_enabled", MechanicAccess.global(), ServerRules.INSTANT_ITEM_MERGE)) return;
 
         ItemEntity self = (ItemEntity)(Object)this;
         Level world = self.level();
 
         if (world.isClientSide()) return;
 
-        double radius = ServerRules.ITEM_MERGE_RADIUS;
+        double radius = MechanicAccess.number("item_merge_radius", MechanicAccess.global(), ServerRules.ITEM_MERGE_RADIUS);
 
         List<ItemEntity> items = world.getEntitiesOfClass(
                 ItemEntity.class,

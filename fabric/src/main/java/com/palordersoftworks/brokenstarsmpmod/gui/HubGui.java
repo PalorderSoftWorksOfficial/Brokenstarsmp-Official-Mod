@@ -2,6 +2,8 @@ package com.palordersoftworks.brokenstarsmpmod.gui;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtras;
+import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import com.palordersoftworks.brokenstarsmpmod.economy.playervault.PlayerVaultPickerUi;
 import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopConfig;
 import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopUi;
@@ -90,8 +92,7 @@ public final class HubGui {
     }
 
     private static boolean isGamemaster(ServerPlayer player) {
-        return player.createCommandSourceStack().permissions().hasPermission(
-                new net.minecraft.server.permissions.Permission.HasCommandLevel(
-                        net.minecraft.server.permissions.PermissionLevel.GAMEMASTERS));
+        return PermissionCompat.has(player.createCommandSourceStack(), PermissionNodes.GAMEMASTER)
+                || PermissionCompat.has(player.createCommandSourceStack(), PermissionNodes.ECONOMY_MANAGER);
     }
 }

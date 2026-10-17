@@ -5,6 +5,7 @@ import com.palordersoftworks.brokenstarsmpmod.economy.playervault.PlayerVaultCom
 import com.palordersoftworks.brokenstarsmpmod.economy.playervault.PlayerVaultManager;
 import com.palordersoftworks.brokenstarsmpmod.economy.wand.SellWand;
 import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import com.reazip.economycraft.EconomyCraft;
 import com.reazip.economycraft.EconomyManager;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -66,7 +67,7 @@ public final class EconomyExtras {
                     .executes(ctx -> redeem(ctx.getSource().getPlayerOrException())));
 
             dispatcher.register(Commands.literal("givesellwand")
-                    .requires(PermissionCompat.gamemaster())
+                    .requires(source -> PermissionCompat.has(source, PermissionNodes.ECONOMY_MANAGER))
                     .executes(ctx -> giveSellWand(ctx.getSource().getPlayerOrException(), ctx.getSource().getPlayerOrException()))
                     .then(Commands.argument("player", EntityArgument.player())
                             .executes(ctx -> giveSellWand(

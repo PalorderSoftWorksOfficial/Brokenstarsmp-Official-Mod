@@ -1,5 +1,6 @@
 package com.palordersoftworks.luaj.accesswidener;
 
+import com.palordersoftworks.luaj.sandboxing.Main;
 import com.palordersoftworks.luaj.sandboxing.SandboxProcess;
 import net.fabricmc.loader.api.FabricLoader;
 import org.jspecify.annotations.Nullable;
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class LuaScriptManager {
+    private static volatile LuaScriptManager shared;
     private static final int DEFAULT_POOL_SIZE = 5;
     private static final long DEFAULT_MEMORY_LIMIT_MB = 128;
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMillis(250);
@@ -31,6 +33,24 @@ public final class LuaScriptManager {
     private final Duration timeout;
 
     private volatile Consumer<String> malwareAlertSink = message -> System.err.println(message);
+
+    public static LuaScriptManager shared() {
+        LuaScriptManager current = shared;
+        if (current == null) {
+            synchronized (LuaScriptManager.class) {
+                current = shared;
+                if (current == null) {
+                    current = new LuaScriptManager();
+                    shared = current;
+                }
+            }
+        }
+        return current;
+    }
+
+    public static List<String> reloadShared() {
+        return shared().reloadAll();
+    }
 
     public LuaScriptManager() {
         this(DEFAULT_POOL_SIZE, DEFAULT_MEMORY_LIMIT_MB, DEFAULT_TIMEOUT);
@@ -160,7 +180,8 @@ public final class LuaScriptManager {
         boolean returnToPool = false;
 
         try {
-            SandboxProcess.ExecutionResult result = worker.execute(code, timeout);
+            String sandboxedCode = Main.sandboxPrelude() + "\n" + (code == null ? "" : code);
+            SandboxProcess.ExecutionResult result = worker.execute(sandboxedCode, timeout);
 
             if (result.suspicious()) {
                 String message = "malware alert in script '" + scriptName + "': " + result.error();

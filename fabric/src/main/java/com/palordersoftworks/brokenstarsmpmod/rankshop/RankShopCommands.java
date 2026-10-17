@@ -4,6 +4,8 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -128,21 +130,8 @@ public final class RankShopCommands {
     }
 
     private static boolean isAdmin(CommandSourceStack source) {
-        if (source.getPlayer() == null) {
-            return true; // console
-        }
-        if (source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.GAMEMASTERS))) {
-            return true;
-        }
-        // Optional permission-node override via fabric-permissions-api, when present.
-        try {
-            Class<?> permissionsClass = Class.forName("me.lucko.fabric.api.permissions.v0.Permissions");
-            Object result = permissionsClass.getMethod("check", ServerPlayer.class, String.class, boolean.class)
-                    .invoke(null, source.getPlayer(), RankShopConfig.RANK_SHOP_ADMIN_PERMISSION, false);
-            return result instanceof Boolean value && value;
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-            return false;
-        }
+        return PermissionCompat.hasAny(source, RankShopConfig.RANK_SHOP_ADMIN_PERMISSION,
+                PermissionNodes.RANKTOKENS_ADMIN, PermissionNodes.ECONOMY_MANAGER, PermissionNodes.GAMEMASTER);
     }
 
     /** Resolves an online or offline player name via EconomyCraft's resolver. */

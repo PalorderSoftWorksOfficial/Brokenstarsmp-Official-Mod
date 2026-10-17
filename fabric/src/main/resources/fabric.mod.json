@@ -34,7 +34,9 @@
   },
   "suggests": {
     "luckperms": "*",
-    "fabric-permissions-api-v0": "*"
+    "fabric-permissions-api-v0": "*",
+    "placeholder-api": "*",
+    "banhammer": "*"
   },
   "accessWidener": "brokenstarsmp.accesswidener"
 }

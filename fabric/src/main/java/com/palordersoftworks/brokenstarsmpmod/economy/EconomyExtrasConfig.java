@@ -21,6 +21,7 @@ public final class EconomyExtrasConfig {
     public int playerVaultDefaultAmount = 1;
     public int playerVaultMaxAmount = 54;
     public String playerVaultLuckPermsMetaKey = "brokenstarsmp.economy.playervault.amount";
+    public String playerVaultScalePermission = "brokenstarsmp.economy.playervault.scale";
     public long playerVaultUnlockCost = 0L;
     public boolean banknotesEnabled = true;
     public boolean sellWandEnabled = true;
@@ -75,8 +76,12 @@ public final class EconomyExtrasConfig {
         if (playerVaultRows > 6) playerVaultRows = 6;
         if (playerVaultDefaultAmount < 0) playerVaultDefaultAmount = 0;
         if (playerVaultMaxAmount < 1) playerVaultMaxAmount = 54;
+        if (playerVaultMaxAmount > Integer.MAX_VALUE) playerVaultMaxAmount = Integer.MAX_VALUE;
         if (playerVaultLuckPermsMetaKey == null || playerVaultLuckPermsMetaKey.isBlank()) {
             playerVaultLuckPermsMetaKey = "brokenstarsmp.economy.playervault.amount";
+        }
+        if (playerVaultScalePermission == null || playerVaultScalePermission.isBlank()) {
+            playerVaultScalePermission = "brokenstarsmp.economy.playervault.scale";
         }
         if (playerVaultUnlockCost < 0) playerVaultUnlockCost = 0;
     }

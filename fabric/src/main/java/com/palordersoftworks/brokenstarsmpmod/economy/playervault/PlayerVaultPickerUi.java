@@ -3,6 +3,7 @@ package com.palordersoftworks.brokenstarsmpmod.economy.playervault;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtras;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtrasConfig;
 import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import com.reazip.economycraft.EconomyCraft;
 import com.reazip.economycraft.EconomyManager;
 import java.util.ArrayList;
@@ -124,7 +125,8 @@ public final class PlayerVaultPickerUi {
                     .withStyle(s -> s.withItalic(false).withColor(ChatFormatting.YELLOW)));
             container.setItem(49, bal);
 
-            if (PermissionCompat.gamemaster().test(viewer.createCommandSourceStack())) {
+            if (PermissionCompat.has(viewer.createCommandSourceStack(), PermissionNodes.PLAYER_VAULT_ADMIN)
+                    || PermissionCompat.has(viewer.createCommandSourceStack(), PermissionNodes.GAMEMASTER)) {
                 ItemStack admin = new ItemStack(Items.COMMAND_BLOCK);
                 admin.set(DataComponents.CUSTOM_NAME, Component.literal("Admin Vaults")
                         .withStyle(s -> s.withItalic(false).withColor(ChatFormatting.LIGHT_PURPLE)));
@@ -160,7 +162,8 @@ public final class PlayerVaultPickerUi {
                     render();
                     return;
                 }
-                if (slot == 53 && PermissionCompat.gamemaster().test(viewer.createCommandSourceStack())) {
+                if (slot == 53 && (PermissionCompat.has(viewer.createCommandSourceStack(), PermissionNodes.PLAYER_VAULT_ADMIN)
+                        || PermissionCompat.has(viewer.createCommandSourceStack(), PermissionNodes.GAMEMASTER))) {
                     PlayerVaultAdminUi.open(viewer);
                     return;
                 }

@@ -1,6 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicAccess;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -36,7 +37,7 @@ public abstract class ServerWorld_EntityProcessingLimit_Mixin {
             Arrays.fill(brokenstarsmpmod$slotCounts, 0);
         }
 
-        int globalBudget = ServerRules.ENTITY_TICK_BUDGET;
+        int globalBudget = MechanicAccess.integer("entity_tick_budget", MechanicAccess.level(world), ServerRules.ENTITY_TICK_BUDGET);
         if (globalBudget >= 0 && brokenstarsmpmod$totalProcessedThisTick >= globalBudget) {
             ci.cancel();
             return;

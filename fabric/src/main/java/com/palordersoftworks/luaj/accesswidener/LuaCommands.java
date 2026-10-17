@@ -2,13 +2,14 @@ package com.palordersoftworks.luaj.accesswidener;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 
 public final class LuaCommands {
-    private static final LuaScriptManager LUA = new LuaScriptManager();
+    private static final LuaScriptManager LUA = LuaScriptManager.shared();
 
     private static ScriptHost host(CommandSourceStack source) {
         return new ScriptHost(
@@ -20,7 +21,7 @@ public final class LuaCommands {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("lua")
-                    .requires(source -> PermissionCompat.gamemaster().test(source))
+                    .requires(source -> PermissionCompat.has(source, PermissionNodes.SCRIPT_MANAGER))
                     .then(Commands.literal("reload").executes(ctx -> {
                         LUA.reloadAll();
                         return 1;

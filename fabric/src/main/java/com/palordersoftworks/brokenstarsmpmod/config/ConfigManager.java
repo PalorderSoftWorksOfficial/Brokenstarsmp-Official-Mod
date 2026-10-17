@@ -6,6 +6,9 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.palordersoftworks.brokenstarsmpmod.config.Enums.RuleType;
+import com.palordersoftworks.brokenstarsmpmod.framework.FrameworkCommands;
+import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
@@ -18,6 +21,8 @@ import net.minecraft.network.chat.MutableComponent;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.representer.Representer;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -169,7 +174,11 @@ public final class ConfigManager {
                 if (entry.configClass != clazz || !values.containsKey(entry.key)) {
                     continue;
                 }
-                applyValue(entry, convertValue(values.get(entry.key), entry.type));
+                try {
+                    applyValue(entry, convertValue(values.get(entry.key), entry.type));
+                } catch (RuntimeException exception) {
+                    LOGGER.warn("Invalid value for {} in {}; keeping previous value", entry.key, path, exception);
+                }
             }
         } catch (IOException | RuntimeException exception) {
             LOGGER.warn("Unable to load config {}; using defaults", path, exception);
@@ -181,6 +190,18 @@ public final class ConfigManager {
         try {
             Files.createDirectories(path.getParent());
             Map<String, Object> values = new LinkedHashMap<>();
+            if (Files.exists(path)) {
+                try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+                    Object existing = YAML.load(reader);
+                    if (existing instanceof Map<?, ?> map) {
+                        for (Map.Entry<?, ?> entry : map.entrySet()) {
+                            if (entry.getKey() instanceof String key) {
+                                values.put(key, entry.getValue());
+                            }
+                        }
+                    }
+                }
+            }
             for (ConfigEntry<?> entry : CONFIGS.values()) {
                 if (entry.configClass == clazz) {
                     values.put(entry.key, entry.get());
@@ -201,6 +222,12 @@ public final class ConfigManager {
         }
     }
 
+    public static synchronized void reloadAll() {
+        for (Class<?> clazz : CONFIG_FILES.keySet()) {
+            loadConfig(clazz);
+        }
+    }
+
     public static Path getConfigFile(Class<?> clazz) {
         Path path = CONFIG_FILES.get(clazz);
         if (path == null) {
@@ -213,9 +240,9 @@ public final class ConfigManager {
     public static void registerCommands() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             var root = Commands.literal("brokenstarsmp")
-                    // Admin-only: configuring server rules requires op level 2 (gamemasters).
-                    .requires(source -> source.permissions()
-                            .hasPermission(new Permission.HasCommandLevel(PermissionLevel.GAMEMASTERS)));
+                    .requires(source -> PermissionCompat.hasAny(source, PermissionNodes.GAMEMASTER,
+                            PermissionNodes.ADMINISTRATOR, PermissionNodes.CONFIG_MANAGER,
+                            PermissionNodes.MECHANIC_MANAGER));
 
             root.executes(context -> {
                 for (ConfigEntry<?> entry : CONFIGS.values()) {
@@ -294,6 +321,8 @@ public final class ConfigManager {
                 }
             }
 
+            FrameworkCommands.attach(root);
+            FrameworkCommands.registerAliases(dispatcher);
             dispatcher.register(root);
         });
     }
@@ -355,7 +384,11 @@ public final class ConfigManager {
                 if (!(value instanceof Number number)) {
                     throw new IllegalArgumentException("Expected number but got " + value);
                 }
-                yield number.doubleValue();
+                double result = number.doubleValue();
+                if (!Double.isFinite(result)) {
+                    throw new IllegalArgumentException("Expected finite number but got " + value);
+                }
+                yield result;
             }
             case STRING, ENUM -> {
                 if (!(value instanceof String stringValue)) {
@@ -406,7 +439,9 @@ public final class ConfigManager {
         options.setPrettyFlow(true);
         options.setIndent(2);
         options.setWidth(120);
-        return new Yaml(new LoaderOptions(), options);
+        LoaderOptions loader = new LoaderOptions();
+        loader.setAllowDuplicateKeys(false);
+        return new Yaml(new SafeConstructor(loader), new Representer(options), options, loader);
     }
 
     private static String toFileName(Class<?> clazz) {

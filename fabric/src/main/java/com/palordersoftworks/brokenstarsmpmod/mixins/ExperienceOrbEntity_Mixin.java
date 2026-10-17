@@ -1,6 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicAccess;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.player.Player;
@@ -20,6 +21,7 @@ public class ExperienceOrbEntity_Mixin {
             )
     )
     private Player brokenstarsmpmod$increaseRange(Level world, Entity entity, double distance) {
-        return world.getNearestPlayer(entity, ServerRules.EXPERIENCE_ORB_RANGE);
+        double range = MechanicAccess.number("experience_orb_range", MechanicAccess.global(), ServerRules.EXPERIENCE_ORB_RANGE);
+        return world.getNearestPlayer(entity, range);
     }
 }

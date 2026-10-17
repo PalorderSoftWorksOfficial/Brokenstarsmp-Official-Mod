@@ -7,6 +7,12 @@ import com.palordersoftworks.brokenstarsmpmod.config.ConfigManager;
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
 import com.palordersoftworks.brokenstarsmpmod.config.TeamRules;
 import com.palordersoftworks.brokenstarsmpmod.config.UnstableSMPRules;
+import com.palordersoftworks.brokenstarsmpmod.framework.BrokenStarsFramework;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicAccess;
+import com.palordersoftworks.brokenstarsmpmod.framework.permissions.FrameworkPermissionService;
+import com.palordersoftworks.brokenstarsmpmod.framework.placeholders.BrokenStarsPlaceholders;
+import com.palordersoftworks.brokenstarsmpmod.framework.punishments.PunishmentService;
+import com.palordersoftworks.brokenstarsmpmod.messages.Messages;
 import com.palordersoftworks.brokenstarsmpmod.fluid.CobbleOreQueue;
 import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopCommands;
 import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopConfig;
@@ -46,7 +52,6 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 
-import static com.palordersoftworks.brokenstarsmpmod.config.ServerRules.DROP_AT_FEET_RADIUS;
 
 
 public class DropAtFeet implements ModInitializer {
@@ -64,6 +69,10 @@ public class DropAtFeet implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             serverTick++;
             tickScheduledTasks();
+            BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+            if (framework != null) {
+                framework.tick(server);
+            }
         });
 
 
@@ -71,6 +80,8 @@ public class DropAtFeet implements ModInitializer {
         ConfigManager.registerAnnotatedConfigs(UnstableSMPRules.class);
         ConfigManager.registerAnnotatedConfigs(TeamRules.class);
         ConfigManager.registerAnnotatedConfigs(RankShopConfig.class);
+        Messages.initialize();
+        new BrokenStarsFramework();
 
         ConfigManager.registerCommands();
 
@@ -88,22 +99,45 @@ public class DropAtFeet implements ModInitializer {
             ImmortalCommand.register(dispatcher, registryAccess, environment);            TeamsCommand.register(dispatcher);
             RankShopCommands.register(dispatcher);
             HubGui.register(dispatcher);
+            com.palordersoftworks.brokenstarsmpmod.framework.PlayerAdminCommands.register(dispatcher, registryAccess);
         });
 
-        ServerLifecycleEvents.SERVER_STARTED.register(RankShopService::init);
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+            if (framework != null) {
+                framework.bind(server);
+                framework.dispatchCallback("server_start", server.getServerDirectory().toString());
+            }
+            RankShopService.init(server);
+            PunishmentService.registerAuditBridge(framework);
+        });
 
-        ServerLifecycleEvents.SERVER_STOPPING.register(server ->
-                RankShopService.shutdown()
-        );
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+            if (framework != null) {
+                framework.dispatchCallback("server_stop", server.getServerDirectory().toString());
+                framework.shutdown();
+            }
+            RankShopService.shutdown();
+        });
 
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
-                RankShopService.onPlayerJoin(handler.player)
-        );
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+            if (framework != null) {
+                framework.dispatchCallback("player_join", handler.player.getUUID().toString());
+            }
+            RankShopService.onPlayerJoin(handler.player);
+        });
 
 
         ServerLifecycleEvents.SERVER_STARTED.register(
                 TranslationProbeController::init
         );
+
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            FrameworkPermissionService.init();
+            BrokenStarsPlaceholders.register();
+        });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(
                 TranslationProbeController::onServerStopping
@@ -132,9 +166,13 @@ public class DropAtFeet implements ModInitializer {
                 )
         );
 
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
-                TeamManager.onPlayerLeave(handler.player)
-        );
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+            if (framework != null) {
+                framework.dispatchCallback("player_quit", handler.player.getUUID().toString());
+            }
+            TeamManager.onPlayerLeave(handler.player);
+        });
 
         ServerLifecycleEvents.SERVER_STARTED.register(server ->
                 TeamManager.init(server)
@@ -146,7 +184,7 @@ public class DropAtFeet implements ModInitializer {
 
 
         try {
-            new LuaScriptManager();
+            LuaScriptManager.shared();
         } catch (RuntimeException e) {
             LOGGER.warn("Lua script manager failed to initialize; Lua features disabled", e);
         }
@@ -164,7 +202,7 @@ public class DropAtFeet implements ModInitializer {
             double iy = item.getY();
             double iz = item.getZ();
 
-            int r = DROP_AT_FEET_RADIUS;
+            int r = MechanicAccess.integer("drop_at_feet_radius", MechanicAccess.level(serverWorld), 0);
 
 
             for (Player player : serverWorld.players()) {

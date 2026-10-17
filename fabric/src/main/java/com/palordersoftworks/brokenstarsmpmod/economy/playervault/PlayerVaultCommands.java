@@ -8,6 +8,9 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtras;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtrasConfig;
 import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -16,7 +19,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 public final class PlayerVaultCommands {
-    public static final String PERMISSION_NODE = "brokenstarsmp.economy.playervault";
+    public static final String PERMISSION_NODE = PermissionNodes.PLAYER_VAULT;
 
     private PlayerVaultCommands() {}
 
@@ -45,8 +48,7 @@ public final class PlayerVaultCommands {
     public static boolean mayUse(CommandSourceStack source) {
         if (!EconomyExtrasConfig.get().playerVaultEnabled) return false;
         if (!EconomyExtrasConfig.get().playerVaultRequirePermission) return true;
-        // Soft gate when requirePermission is on: allow console and permission-level players via PermissionCompat.
-        return source.getPlayer() == null || PermissionCompat.gamemaster().test(source);
+        return source.getPlayer() == null || PermissionCompat.has(source, PermissionNodes.PLAYER_VAULT);
     }
 
     private static CompletableFuture<Suggestions> suggestVaultNumbers(
@@ -60,7 +62,7 @@ public final class PlayerVaultCommands {
         int max = resolveMaxVaults(p);
         int unlocked = vaults.getUnlockedVaultCount(p.getUUID(), max);
         String prefix = builder.getRemaining().toLowerCase();
-        for (int i = 1; i <= unlocked; i++) {
+        for (int i = 1; i <= unlocked && i <= 100; i++) {
             String s = String.valueOf(i);
             if (prefix.isEmpty() || s.startsWith(prefix)) builder.suggest(s);
         }
@@ -133,9 +135,34 @@ public final class PlayerVaultCommands {
     }
 
     public static int resolveMaxVaults(ServerPlayer player) {
+        if (PermissionCompat.hasPermissionNode(player, scalePermission())) {
+            return resolveMaxVaults(player.getUUID());
+        }
+        return baseMaxVaults();
+    }
+
+    public static int resolveMaxVaults(UUID player) {
+        if (PermissionCompat.hasPermissionNode(player, scalePermission())) {
+            Optional<String> metadata = PermissionCompat.luckPermsMeta(player, metaKey());
+            return PermissionCompat.clampedInt(metadata, baseMaxVaults(), 0, Integer.MAX_VALUE);
+        }
+        return baseMaxVaults();
+    }
+
+    private static int baseMaxVaults() {
         EconomyExtrasConfig cfg = EconomyExtrasConfig.get();
-        int def = Math.max(0, cfg.playerVaultDefaultAmount);
+        int configured = Math.max(0, cfg.playerVaultDefaultAmount);
         int cap = Math.max(1, cfg.playerVaultMaxAmount);
-        return Math.min(cap, def);
+        return Math.min(cap, configured);
+    }
+
+    private static String scalePermission() {
+        String configured = EconomyExtrasConfig.get().playerVaultScalePermission;
+        return configured == null || configured.isBlank() ? PermissionNodes.PLAYER_VAULT_SCALE : configured;
+    }
+
+    private static String metaKey() {
+        String configured = EconomyExtrasConfig.get().playerVaultLuckPermsMetaKey;
+        return configured == null || configured.isBlank() ? "brokenstarsmp.economy.playervault.amount" : configured;
     }
 }

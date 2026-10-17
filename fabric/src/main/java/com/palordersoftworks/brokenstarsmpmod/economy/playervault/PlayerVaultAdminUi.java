@@ -3,6 +3,7 @@ package com.palordersoftworks.brokenstarsmpmod.economy.playervault;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtras;
 import com.palordersoftworks.brokenstarsmpmod.economy.EconomyExtrasConfig;
 import com.palordersoftworks.brokenstarsmpmod.helpers.PermissionCompat;
+import com.palordersoftworks.brokenstarsmpmod.permissions.PermissionNodes;
 import com.reazip.economycraft.EconomyCraft;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,8 @@ public final class PlayerVaultAdminUi {
     private PlayerVaultAdminUi() {}
 
     public static void open(ServerPlayer admin) {
-        if (!PermissionCompat.gamemaster().test(admin.createCommandSourceStack())) {
+        if (!PermissionCompat.has(admin.createCommandSourceStack(), PermissionNodes.PLAYER_VAULT_ADMIN)
+                && !PermissionCompat.has(admin.createCommandSourceStack(), PermissionNodes.GAMEMASTER)) {
             admin.sendSystemMessage(Component.literal("No permission.").withStyle(ChatFormatting.RED));
             return;
         }
@@ -90,9 +92,9 @@ public final class PlayerVaultAdminUi {
 
         private void render() {
             container.clearContent();
-            int max = EconomyExtrasConfig.get().playerVaultMaxAmount;
             for (int i = 0; i < Math.min(45, players.size()); i++) {
                 UUID uuid = players.get(i);
+                int max = PlayerVaultCommands.resolveMaxVaults(uuid);
                 String name = EconomyCraft.getManager(admin.level().getServer()).getBestName(uuid);
                 int unlocked = vaults.getUnlockedVaultCount(uuid, max);
                 ItemStack head = new ItemStack(Items.PLAYER_HEAD);
@@ -170,7 +172,7 @@ public final class PlayerVaultAdminUi {
 
         private void render() {
             container.clearContent();
-            int max = EconomyExtrasConfig.get().playerVaultMaxAmount;
+            int max = PlayerVaultCommands.resolveMaxVaults(target);
             int unlocked = vaults.getUnlockedVaultCount(target, max);
             for (int i = 1; i <= unlocked && i <= 45; i++) {
                 String vName = vaults.getVaultName(target, i);
@@ -202,7 +204,7 @@ public final class PlayerVaultAdminUi {
         @Override
         public void clicked(int slot, int button, ContainerInput type, Player player) {
             if (type == ContainerInput.PICKUP || type == ContainerInput.QUICK_MOVE) {
-                int unlocked = vaults.getUnlockedVaultCount(target, EconomyExtrasConfig.get().playerVaultMaxAmount);
+                int unlocked = vaults.getUnlockedVaultCount(target, PlayerVaultCommands.resolveMaxVaults(target));
                 if (slot >= 0 && slot < unlocked) {
                     int vaultIndex = slot + 1;
                     if (type == ContainerInput.QUICK_MOVE) {

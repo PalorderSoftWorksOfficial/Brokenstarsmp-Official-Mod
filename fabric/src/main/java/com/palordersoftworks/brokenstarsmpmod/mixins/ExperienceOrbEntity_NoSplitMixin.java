@@ -1,6 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicAccess;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.phys.Vec3;
@@ -18,7 +19,7 @@ public abstract class ExperienceOrbEntity_NoSplitMixin {
             cancellable = true
     )
     private static void noSplit(ServerLevel world, Vec3 pos, int amount, CallbackInfo ci) {
-        if (!ServerRules.NO_XP_SPLIT) return;
+        if (MechanicAccess.bool("xp_splitting_enabled", MechanicAccess.global(), !ServerRules.NO_XP_SPLIT)) return;
         world.addFreshEntity(new ExperienceOrb(world, pos, Vec3.ZERO, amount));
 
         ci.cancel();

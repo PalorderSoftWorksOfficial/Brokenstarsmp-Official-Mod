@@ -1,6 +1,7 @@
 package com.palordersoftworks.brokenstarsmpmod.mixins;
 
 import com.palordersoftworks.brokenstarsmpmod.config.ServerRules;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -16,7 +17,7 @@ public abstract class LeavesBlock_Mixin {
 
     @Inject(method = "randomTick(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V", at = @At("HEAD"), cancellable = true)
     private void disableDecay(BlockState state, ServerLevel world, BlockPos pos, RandomSource random, CallbackInfo ci) {
-        if (ServerRules.DISABLE_LEAF_DECAY) {
+        if (!MechanicAccess.bool("leaf_decay_enabled", MechanicAccess.level(world), !ServerRules.DISABLE_LEAF_DECAY)) {
             ci.cancel();
         }
     }

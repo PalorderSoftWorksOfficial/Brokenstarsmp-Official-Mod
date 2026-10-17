@@ -1,5 +1,10 @@
 package com.palordersoftworks.brokenstarsmpmod.api;
 
+import com.palordersoftworks.brokenstarsmpmod.framework.BrokenStarsFramework;
+import com.palordersoftworks.brokenstarsmpmod.framework.events.EventDefinition;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicContext;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicDefinition;
+import com.palordersoftworks.brokenstarsmpmod.framework.mechanics.MechanicResolution;
 import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopEconomy;
 import com.palordersoftworks.brokenstarsmpmod.rankshop.RankShopService;
 import com.palordersoftworks.brokenstarsmpmod.teams.TeamManager;
@@ -8,6 +13,8 @@ import net.minecraft.server.MinecraftServer;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -115,5 +122,99 @@ public final class BrokenStarsApi {
 
     private static TeamInfo toInfo(TeamManager.TeamData team) {
         return new TeamInfo(team.name(), team.owner(), Set.copyOf(team.members()), team.color());
+    }
+
+    public static Optional<MechanicResolution> mechanic(String mechanicId) {
+        return mechanic(mechanicId, MechanicContext.global());
+    }
+
+    public static Optional<MechanicResolution> mechanic(String mechanicId, MechanicContext context) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework == null || !framework.registry().contains(mechanicId)) {
+            return Optional.empty();
+        }
+        return Optional.of(framework.read(mechanicId, context));
+    }
+
+    public static boolean writeMechanic(String mechanicId, Object value, MechanicContext context) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework == null) {
+            return false;
+        }
+        try {
+            framework.write(mechanicId, value, context, null, "api");
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    public static boolean removeMechanic(String overrideId) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        return framework != null && framework.remove(overrideId, null, "api");
+    }
+
+    public static List<String> profiles() {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework == null) {
+            return List.of();
+        }
+        return framework.profiles().all().stream().map(com.palordersoftworks.brokenstarsmpmod.framework.profiles.MechanicProfile::id).toList();
+    }
+
+    public static Optional<String> activeProfile() {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        return framework == null ? Optional.empty() : Optional.of(framework.profiles().active());
+    }
+
+    public static boolean applyProfile(String profile) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        return framework != null && framework.profiles().apply(profile);
+    }
+
+    public static boolean startEvent(String event) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        return framework != null && framework.events().start(event).successful();
+    }
+
+    public static boolean stopEvent(String event) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        return framework != null && framework.events().stop(event);
+    }
+
+    public static List<String> activeEvents() {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework == null) {
+            return List.of();
+        }
+        return framework.events().active().stream().map(EventDefinition::id).toList();
+    }
+
+    public static void registerMechanic(MechanicDefinition definition) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework != null) {
+            framework.registerMechanic(definition);
+        }
+    }
+
+    public static void registerCondition(String id, Predicate<MechanicContext> condition) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework != null) {
+            framework.registerCondition(id, condition);
+        }
+    }
+
+    public static void registerEventCallback(String id, Consumer<EventDefinition> callback) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework != null) {
+            framework.registerEventCallback(id, callback);
+        }
+    }
+
+    public static void registerCallback(String id, Consumer<String> callback) {
+        BrokenStarsFramework framework = BrokenStarsFramework.getOrNull();
+        if (framework != null) {
+            framework.registerCallback(id, callback);
+        }
     }
 }
