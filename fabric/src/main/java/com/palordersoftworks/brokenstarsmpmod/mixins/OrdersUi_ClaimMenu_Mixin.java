@@ -155,14 +155,23 @@ public abstract class OrdersUi_ClaimMenu_Mixin {
         return entry.copy();
     }
 
-    /** Inserts a claimed stack; any remainder (inventory full) goes back to the ledger. */
+    /**
+     * Inserts a claimed stack into the player inventory; any remainder (inventory
+     * full) goes back to the ledger so it can be tried again later.
+     */
     @Unique
     private void bs$deliverOrRollback(ServerPlayer player, ItemStack claimed) {
-        if (!player.getInventory().add(claimed) && !claimed.isEmpty()) {
+        if (claimed.isEmpty()) {
+            return;
+        }
+        if (!player.getInventory().add(claimed)) {
             // add() shrinks `claimed` to whatever did not fit; re-add exactly that.
             eco.getDeliveries().addDelivery(owner, claimed);
             player.sendSystemMessage(Component.literal("Your inventory is full - the items went back to your deliveries.")
                     .withStyle(ChatFormatting.RED));
+        } else {
+            player.sendSystemMessage(Component.literal("Collected your delivery.")
+                    .withStyle(ChatFormatting.GREEN));
         }
     }
 
@@ -204,7 +213,7 @@ public abstract class OrdersUi_ClaimMenu_Mixin {
             player.drop(stack, false);
         }
         updatePage();
-        player.sendSystemMessage(Component.literal("Dropped " + claimed.size() + " deliveries.")
+        player.sendSystemMessage(Component.literal("Collected " + claimed.size() + " deliveries.")
                 .withStyle(ChatFormatting.GREEN));
     }
 }
