@@ -26,7 +26,6 @@
     "MinecraftServer_Mixin",
     "MobEntity_AITickMixin",
     "OrdersUi_ClaimMenu_Mixin",
-    "OrderFulfillmentPaymentMixin",
     "ProjectileEntity_LifetimeMixin",
     "Projectile_TeamFireMixin",
     "ServerPlayerEntity_Mixin",
